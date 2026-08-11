@@ -1,0 +1,104 @@
+import { Injectable } from '@nestjs/common';
+import { TablerosService } from '../tableros/tableros.service';
+import { NotasRepository } from '../notas/notas.repository';
+import { UsersService } from '../users/users.service';
+
+@Injectable()
+export class WidgetService {
+  constructor(
+    private readonly tablerosService: TablerosService,
+    private readonly notasRepository: NotasRepository,
+    private readonly usersService: UsersService,
+  ) {}
+
+  async getFeed(userId: string) {
+    const user = await this.usersService.findById(userId);
+    const seenMap = new Map(
+      (user?.widgetSeen ?? []).map((s) => [s.boardId.toString(), new Date(s.lastSeenAt)]),
+    );
+
+    const boards = await this.tablerosService.listActiveBoardsForUser(userId);
+    const personal = boards.find((b) => b.categoria === 'personal');
+    const shared = boards
+      .filter((b) => b.categoria !== 'personal')
+      .sort((a, b) => {
+        const aTime = (a as { updatedAt?: Date }).updatedAt?.getTime() ?? 0;
+        const bTime = (b as { updatedAt?: Date }).updatedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+
+    const allMemberIds = [
+      ...new Set(boards.flatMap((b) => b.miembros.map((id) => id.toString()))),
+    ];
+    const members = await this.usersService.findByIds(allMemberIds);
+    const usernameMap = new Map(members.map((m) => [m._id.toString(), m.username]));
+
+    const pages: Array<{
+      id: string;
+      boardId: string;
+      boardName: string;
+      boardCategoria: string;
+      text: string;
+      authorUsername: string;
+      isPersonal: boolean;
+      isUnseen: boolean;
+      createdAt?: Date;
+    }> = [];
+
+    let hasUnseen = false;
+
+    const pushBoardNotes = async (
+      board: (typeof boards)[number],
+      ascending: boolean,
+    ) => {
+      const notas = ascending
+        ? await this.notasRepository.findActiveByBoardAsc(board._id.toString())
+        : await this.notasRepository.findActiveByBoard(board._id.toString());
+
+      const isPersonal = board.categoria === 'personal';
+      const displayName = isPersonal
+        ? 'Mi tablero'
+        : board.categoria === 'grupo'
+          ? board.nombre
+          : board.miembros
+              .map((id) => id.toString())
+              .filter((id) => id !== userId)
+              .map((id) => usernameMap.get(id) ?? 'Usuario')
+              .join(' · ') || board.nombre;
+
+      const lastSeen = seenMap.get(board._id.toString());
+
+      for (const nota of notas) {
+        if (nota.type !== 'text' || !nota.text) continue;
+        const createdAt = (nota as { createdAt?: Date }).createdAt;
+        const isUnseen =
+          !isPersonal &&
+          (!lastSeen || (createdAt ? createdAt.getTime() > lastSeen.getTime() : true));
+        if (isUnseen) hasUnseen = true;
+
+        pages.push({
+          id: nota._id.toString(),
+          boardId: board._id.toString(),
+          boardName: displayName,
+          boardCategoria: board.categoria,
+          text: nota.text,
+          authorUsername: usernameMap.get(nota.authorId.toString()) ?? 'Usuario',
+          isPersonal,
+          isUnseen,
+          createdAt,
+        });
+      }
+    };
+
+    if (personal) await pushBoardNotes(personal, false);
+    for (const board of shared) await pushBoardNotes(board, true);
+
+    return { hasUnseen, pages };
+  }
+
+  async markSeen(userId: string, boardId: string) {
+    await this.tablerosService.getByIdForMember(boardId, userId);
+    await this.usersService.markWidgetBoardSeen(userId, boardId);
+    return { ok: true };
+  }
+}

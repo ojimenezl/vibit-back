@@ -6,6 +6,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TablerosModule } from './tableros/tableros.module';
 import { NotasModule } from './notas/notas.module';
+import { ContactsModule } from './contacts/contacts.module';
+import { WidgetModule } from './widget/widget.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { HealthController } from './health/health.controller';
@@ -22,6 +24,8 @@ import { HealthController } from './health/health.controller';
     UsersModule,
     TablerosModule,
     NotasModule,
+    ContactsModule,
+    WidgetModule,
     AuthModule,
   ],
   controllers: [HealthController],

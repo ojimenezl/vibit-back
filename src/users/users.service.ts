@@ -29,6 +29,14 @@ export class UsersService {
     return this.usersRepository.addTablero(userId, tableroId);
   }
 
+  findByIds(ids: string[]) {
+    return this.usersRepository.findByIds(ids);
+  }
+
+  markWidgetBoardSeen(userId: string, boardId: string) {
+    return this.usersRepository.markWidgetBoardSeen(userId, boardId);
+  }
+
   toPublic(user: UserDocument) {
     return this.usersRepository.toPublic(user);
   }

@@ -5,11 +5,18 @@ export type UserDocument = HydratedDocument<User>;
 
 @Schema({ _id: true, timestamps: false })
 export class Notificacion {
-  @Prop({ type: Types.ObjectId, auto: true })
   _id: Types.ObjectId;
 
-  @Prop({ required: true, enum: ['contacto', 'join_tablero'] })
-  tipo: 'contacto' | 'join_tablero';
+  @Prop({
+    required: true,
+    enum: ['contacto', 'join_tablero', 'contacto_aceptado', 'solicitud_enviada', 'contacto_nuevo'],
+  })
+  tipo:
+    | 'contacto'
+    | 'join_tablero'
+    | 'contacto_aceptado'
+    | 'solicitud_enviada'
+    | 'contacto_nuevo';
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   fromUserId: Types.ObjectId;
@@ -20,6 +27,8 @@ export class Notificacion {
   @Prop({ type: Date, required: true })
   expiresAt: Date;
 }
+
+export const NotificacionSchema = SchemaFactory.createForClass(Notificacion);
 
 @Schema({ timestamps: true, collection: 'users' })
 export class User {
@@ -38,7 +47,7 @@ export class User {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   contactos: Types.ObjectId[];
 
-  @Prop({ type: [Notificacion], default: [] })
+  @Prop({ type: [NotificacionSchema], default: [] })
   notificaciones: Notificacion[];
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Tablero' }], default: [] })
@@ -49,6 +58,17 @@ export class User {
 
   @Prop({ type: String, default: null })
   googleId: string | null;
+
+  @Prop({
+    type: [
+      {
+        boardId: { type: Types.ObjectId, ref: 'Tablero', required: true },
+        lastSeenAt: { type: Date, required: true },
+      },
+    ],
+    default: [],
+  })
+  widgetSeen: { boardId: Types.ObjectId; lastSeenAt: Date }[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

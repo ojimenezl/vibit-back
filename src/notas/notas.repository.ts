@@ -23,6 +23,38 @@ export class NotasRepository {
       .exec();
   }
 
+  findActiveByBoardAsc(boardId: string): Promise<NotaDocument[]> {
+    const now = new Date();
+    return this.notaModel
+      .find({
+        boardId: new Types.ObjectId(boardId),
+        deletedAt: null,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      })
+      .sort({ createdAt: 1 })
+      .exec();
+  }
+
+  findById(id: string): Promise<NotaDocument | null> {
+    return this.notaModel.findById(id).exec();
+  }
+
+  softDelete(id: string): Promise<NotaDocument | null> {
+    return this.notaModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { deletedAt: new Date() } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  updateText(id: string, text: string): Promise<NotaDocument | null> {
+    return this.notaModel
+      .findByIdAndUpdate(id, { $set: { text } }, { returnDocument: 'after' })
+      .exec();
+  }
+
   toPublic(nota: NotaDocument) {
     const reactions: Record<string, string> = {};
     if (nota.reactions) {

@@ -18,6 +18,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
+    if (!(exception instanceof HttpException)) {
+      console.error('[Unhandled]', exception);
+    }
+
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : null;
 
@@ -25,7 +29,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       typeof exceptionResponse === 'string'
         ? exceptionResponse
         : ((exceptionResponse as { message?: string | string[] })?.message ??
-          'Error interno del servidor');
+          (exception instanceof Error ? exception.message : 'Error interno del servidor'));
 
     response.status(status).json({
       success: false,

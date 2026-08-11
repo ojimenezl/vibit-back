@@ -26,9 +26,37 @@ export class TablerosRepository {
       .exec();
   }
 
+  findSharedForUser(userId: string): Promise<TableroDocument[]> {
+    const now = new Date();
+    return this.tableroModel
+      .find({
+        miembros: new Types.ObjectId(userId),
+        categoria: { $in: ['directa', 'grupo'] },
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      })
+      .sort({ updatedAt: -1 })
+      .exec();
+  }
+
+  findActiveForUser(userId: string): Promise<TableroDocument[]> {
+    const now = new Date();
+    return this.tableroModel
+      .find({
+        miembros: new Types.ObjectId(userId),
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+      })
+      .exec();
+  }
+
   updateNombre(id: string, nombre: string): Promise<TableroDocument | null> {
     return this.tableroModel
-      .findByIdAndUpdate(id, { $set: { nombre } }, { new: true })
+      .findByIdAndUpdate(id, { $set: { nombre } }, { returnDocument: 'after' })
+      .exec();
+  }
+
+  touchExpiresAt(id: string, expiresAt: Date): Promise<TableroDocument | null> {
+    return this.tableroModel
+      .findByIdAndUpdate(id, { $set: { expiresAt } }, { returnDocument: 'after' })
       .exec();
   }
 
@@ -37,7 +65,7 @@ export class TablerosRepository {
       .findByIdAndUpdate(
         tableroId,
         { $addToSet: { miembros: userId } },
-        { new: true },
+        { returnDocument: 'after' },
       )
       .exec();
   }

@@ -23,12 +23,40 @@ export class UsersRepository {
     return this.userModel.findOne({ linkUser }).exec();
   }
 
+  findByIds(ids: string[]): Promise<UserDocument[]> {
+    if (!ids.length) return Promise.resolve([]);
+    return this.userModel
+      .find({ _id: { $in: ids.map((id) => new Types.ObjectId(id)) } })
+      .exec();
+  }
+
   addTablero(userId: string, tableroId: Types.ObjectId): Promise<UserDocument | null> {
     return this.userModel
       .findByIdAndUpdate(
         userId,
         { $addToSet: { idTableros: tableroId } },
-        { new: true },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  async markWidgetBoardSeen(userId: string, boardId: string, at = new Date()) {
+    const oid = new Types.ObjectId(boardId);
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        { _id: userId, 'widgetSeen.boardId': oid },
+        { $set: { 'widgetSeen.$.lastSeenAt': at } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+
+    if (updated) return updated;
+
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $push: { widgetSeen: { boardId: oid, lastSeenAt: at } } },
+        { returnDocument: 'after' },
       )
       .exec();
   }
