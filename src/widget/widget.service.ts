@@ -42,6 +42,8 @@ export class WidgetService {
       authorUsername: string;
       isPersonal: boolean;
       isUnseen: boolean;
+      reactionCounts: { heart: number; laugh: number; wow: number };
+      myReaction: string | null;
       createdAt?: Date;
     }> = [];
 
@@ -76,6 +78,7 @@ export class WidgetService {
           (!lastSeen || (createdAt ? createdAt.getTime() > lastSeen.getTime() : true));
         if (isUnseen) hasUnseen = true;
 
+        const publicNota = this.notasRepository.toPublic(nota, userId);
         pages.push({
           id: nota._id.toString(),
           boardId: board._id.toString(),
@@ -85,6 +88,8 @@ export class WidgetService {
           authorUsername: usernameMap.get(nota.authorId.toString()) ?? 'Usuario',
           isPersonal,
           isUnseen,
+          reactionCounts: publicNota.reactionCounts,
+          myReaction: publicNota.myReaction,
           createdAt,
         });
       }

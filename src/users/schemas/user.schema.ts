@@ -9,14 +9,22 @@ export class Notificacion {
 
   @Prop({
     required: true,
-    enum: ['contacto', 'join_tablero', 'contacto_aceptado', 'solicitud_enviada', 'contacto_nuevo'],
+    enum: [
+      'contacto',
+      'join_tablero',
+      'contacto_aceptado',
+      'solicitud_enviada',
+      'contacto_nuevo',
+      'reaccion',
+    ],
   })
   tipo:
     | 'contacto'
     | 'join_tablero'
     | 'contacto_aceptado'
     | 'solicitud_enviada'
-    | 'contacto_nuevo';
+    | 'contacto_nuevo'
+    | 'reaccion';
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   fromUserId: Types.ObjectId;
@@ -26,6 +34,14 @@ export class Notificacion {
 
   @Prop({ type: String, default: null })
   label: string | null;
+
+  /** heart | laugh | wow */
+  @Prop({ type: String, default: null })
+  reaction: string | null;
+
+  /** Autor de la nota (para “a la nota de Adel”) */
+  @Prop({ type: String, default: null })
+  noteAuthorUsername: string | null;
 
   @Prop({ type: Date, default: Date.now })
   createdAt: Date;

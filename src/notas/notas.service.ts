@@ -10,6 +10,7 @@ import { TablerosService } from '../tableros/tableros.service';
 import { UsersService } from '../users/users.service';
 import { CreateNotaDto } from './dto/create-nota.dto';
 import { UpdateNotaDto } from './dto/update-nota.dto';
+import { ReactNotaDto, REACTION_TYPES } from './dto/react-nota.dto';
 
 @Injectable()
 export class NotasService {
@@ -57,13 +58,13 @@ export class NotasService {
       await this.usersService.markWidgetBoardSeen(userId, boardId);
     }
 
-    return this.notasRepository.toPublic(nota);
+    return this.notasRepository.toPublic(nota, userId);
   }
 
   async listByBoard(userId: string, boardId: string) {
     await this.tablerosService.getByIdForMember(boardId, userId);
     const notas = await this.notasRepository.findActiveByBoard(boardId);
-    return notas.map((n) => this.notasRepository.toPublic(n));
+    return notas.map((n) => this.notasRepository.toPublic(n, userId));
   }
 
   async update(userId: string, boardId: string, notaId: string, dto: UpdateNotaDto) {
@@ -84,7 +85,7 @@ export class NotasService {
 
     const updated = await this.notasRepository.updateText(notaId, text);
     if (!updated) throw new NotFoundException('Nota no encontrada');
-    return this.notasRepository.toPublic(updated);
+    return this.notasRepository.toPublic(updated, userId);
   }
 
   async softDelete(userId: string, boardId: string, notaId: string) {
@@ -100,5 +101,67 @@ export class NotasService {
     const updated = await this.notasRepository.softDelete(notaId);
     if (!updated) throw new NotFoundException('Nota no encontrada');
     return { ok: true };
+  }
+
+  async react(userId: string, boardId: string, notaId: string, dto: ReactNotaDto) {
+    if (!REACTION_TYPES.includes(dto.type)) {
+      throw new BadRequestException('Reacción no válida');
+    }
+
+    const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
+    if (tablero.categoria === 'personal') {
+      throw new BadRequestException('No hay reacciones en el tablero personal');
+    }
+
+    const nota = await this.notasRepository.findById(notaId);
+    if (!nota || nota.boardId.toString() !== boardId || nota.deletedAt) {
+      throw new NotFoundException('Nota no encontrada');
+    }
+
+    const current =
+      nota.reactions instanceof Map
+        ? (nota.reactions.get(userId) ?? null)
+        : ((nota.reactions as unknown as Record<string, string> | undefined)?.[userId] ??
+          null);
+    const next = current === dto.type ? null : dto.type;
+    const updated = await this.notasRepository.setReaction(notaId, userId, next);
+    if (!updated) throw new NotFoundException('Nota no encontrada');
+
+    if (next) {
+      const authorId = nota.authorId.toString();
+      const author = await this.usersService.findById(authorId);
+      const noteAuthorUsername = author?.username ?? 'Usuario';
+
+      let boardName = tablero.nombre;
+      if (tablero.categoria === 'directa') {
+        const otherIds = tablero.miembros
+          .map((id) => id.toString())
+          .filter((id) => id !== userId);
+        const others = await this.usersService.findByIds(otherIds);
+        boardName = others.map((u) => u.username).join(' · ') || tablero.nombre;
+      }
+
+      const recipients = new Set<string>();
+      if (authorId !== userId) recipients.add(authorId);
+      if (tablero.categoria === 'grupo') {
+        for (const mid of tablero.miembros) {
+          const id = mid.toString();
+          if (id !== userId) recipients.add(id);
+        }
+      }
+
+      if (recipients.size) {
+        void this.usersService.notifyReaction({
+          recipientIds: [...recipients],
+          fromUserId: userId,
+          boardId,
+          boardName,
+          reaction: next,
+          noteAuthorUsername,
+        });
+      }
+    }
+
+    return this.notasRepository.toPublic(updated, userId);
   }
 }

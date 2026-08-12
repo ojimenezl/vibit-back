@@ -49,17 +49,54 @@ export class NotasRepository {
       .exec();
   }
 
+  deleteAllByBoard(boardId: string) {
+    return this.notaModel.deleteMany({ boardId: new Types.ObjectId(boardId) }).exec();
+  }
+
   updateText(id: string, text: string): Promise<NotaDocument | null> {
     return this.notaModel
       .findByIdAndUpdate(id, { $set: { text } }, { returnDocument: 'after' })
       .exec();
   }
 
-  toPublic(nota: NotaDocument) {
+  setReaction(
+    id: string,
+    userId: string,
+    type: string | null,
+  ): Promise<NotaDocument | null> {
+    if (type === null) {
+      return this.notaModel
+        .findByIdAndUpdate(
+          id,
+          { $unset: { [`reactions.${userId}`]: '' } },
+          { returnDocument: 'after' },
+        )
+        .exec();
+    }
+    return this.notaModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { [`reactions.${userId}`]: type } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  toPublic(nota: NotaDocument, viewerId?: string) {
     const reactions: Record<string, string> = {};
-    if (nota.reactions) {
-      for (const [key, value] of nota.reactions.entries()) {
-        reactions[key] = value;
+    const raw = nota.reactions as Map<string, string> | Record<string, string> | undefined;
+    if (raw) {
+      const entries =
+        raw instanceof Map ? Array.from(raw.entries()) : Object.entries(raw);
+      for (const [key, value] of entries) {
+        if (typeof value === 'string') reactions[key] = value;
+      }
+    }
+
+    const reactionCounts = { heart: 0, laugh: 0, wow: 0 };
+    for (const type of Object.values(reactions)) {
+      if (type === 'heart' || type === 'laugh' || type === 'wow') {
+        reactionCounts[type] += 1;
       }
     }
 
@@ -72,6 +109,8 @@ export class NotasRepository {
       text: nota.text,
       media: nota.media,
       reactions,
+      reactionCounts,
+      myReaction: viewerId ? reactions[viewerId] ?? null : null,
       expiresAt: nota.expiresAt,
       createdAt: (nota as NotaDocument & { createdAt?: Date }).createdAt,
       updatedAt: (nota as NotaDocument & { updatedAt?: Date }).updatedAt,

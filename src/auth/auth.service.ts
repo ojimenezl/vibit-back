@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -6,6 +11,7 @@ import { UsersService } from '../users/users.service';
 import { TablerosService } from '../tableros/tableros.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePinDto } from './dto/change-pin.dto';
 
 @Injectable()
 export class AuthService {
@@ -92,5 +98,36 @@ export class AuthService {
       accessToken,
       user: this.usersService.toPublic(user),
     };
+  }
+
+  async verifyPin(userId: string, pin: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const ok = await bcrypt.compare(pin, user.pinHash);
+    if (!ok) throw new UnauthorizedException('PIN incorrecto');
+
+    return {
+      ok: true,
+      userCode: user.userCode,
+      username: user.username,
+      hasGoogle: Boolean(user.googleId),
+    };
+  }
+
+  async changePin(userId: string, dto: ChangePinDto) {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const ok = await bcrypt.compare(dto.currentPin, user.pinHash);
+    if (!ok) throw new UnauthorizedException('PIN actual incorrecto');
+
+    if (dto.currentPin === dto.newPin) {
+      throw new BadRequestException('El nuevo PIN debe ser distinto');
+    }
+
+    const pinHash = await bcrypt.hash(dto.newPin, 12);
+    await this.usersService.updatePinHash(userId, pinHash);
+    return { ok: true };
   }
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -14,6 +15,7 @@ import { TablerosService } from './tableros.service';
 import { UpdateTableroDto } from './dto/update-tablero.dto';
 import { ShareDirectaDto } from './dto/share-directa.dto';
 import { CreateGrupoDto } from './dto/create-grupo.dto';
+import { AddGrupoMiembrosDto } from './dto/add-grupo-miembros.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayloadUser } from '../common/decorators/current-user.decorator';
 import { NotasService } from '../notas/notas.service';
@@ -60,6 +62,29 @@ export class TablerosController {
   @Post(':id/leave')
   leave(@CurrentUser() user: JwtPayloadUser, @Param('id') id: string) {
     return this.tablerosService.leaveGrupo(user.userId, id);
+  }
+
+  @Post(':id/miembros')
+  addMiembros(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id') id: string,
+    @Body() dto: AddGrupoMiembrosDto,
+  ) {
+    return this.tablerosService.addGrupoMiembros(user.userId, id, dto.contactIds);
+  }
+
+  @Delete(':id/miembros/:memberId')
+  removeMiembro(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.tablerosService.removeGrupoMiembro(user.userId, id, memberId);
+  }
+
+  @Delete(':id')
+  deleteBoard(@CurrentUser() user: JwtPayloadUser, @Param('id') id: string) {
+    return this.tablerosService.deleteSharedBoard(user.userId, id);
   }
 
   @Get(':id')

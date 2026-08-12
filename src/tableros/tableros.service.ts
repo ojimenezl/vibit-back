@@ -7,8 +7,10 @@ import {
 import { Types } from 'mongoose';
 import { TablerosRepository } from './tableros.repository';
 import { UsersService } from '../users/users.service';
+import { NotasRepository } from '../notas/notas.repository';
 import { ShareDirectaDto } from './dto/share-directa.dto';
 import { CreateGrupoDto } from './dto/create-grupo.dto';
+import { TableroDocument } from './schemas/tablero.schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -17,6 +19,7 @@ export class TablerosService {
   constructor(
     private readonly tablerosRepository: TablerosRepository,
     private readonly usersService: UsersService,
+    private readonly notasRepository: NotasRepository,
   ) {}
 
   async createPersonal(userId: string, username: string) {
@@ -237,32 +240,124 @@ export class TablerosService {
     };
   }
 
+  /** Borra tablero + todas sus notas + limpia idTableros de miembros. */
+  private async deleteBoardCascade(tablero: TableroDocument) {
+    const boardId = tablero._id.toString();
+    await this.notasRepository.deleteAllByBoard(boardId);
+    await Promise.all(
+      tablero.miembros.map((id) =>
+        this.usersService.removeTablero(id.toString(), tablero._id),
+      ),
+    );
+    await this.tablerosRepository.deleteById(boardId);
+  }
+
   async leaveGrupo(userId: string, boardId: string) {
     const tablero = await this.tablerosRepository.findById(boardId);
     if (!tablero) throw new NotFoundException('Tablero no encontrado');
-    if (tablero.categoria !== 'grupo') {
-      throw new BadRequestException('Solo puedes salir de un grupo');
+    if (tablero.categoria !== 'grupo' && tablero.categoria !== 'directa') {
+      throw new BadRequestException('Solo puedes salir de un tablero compartido');
     }
 
     const isMember = tablero.miembros.some((id) => id.toString() === userId);
-    if (!isMember) throw new ForbiddenException('No perteneces a este grupo');
+    if (!isMember) throw new ForbiddenException('No perteneces a este tablero');
 
     const userOid = new Types.ObjectId(userId);
     const remaining = tablero.miembros.filter((id) => id.toString() !== userId);
 
-    await this.usersService.removeTablero(userId, tablero._id);
-
     if (!remaining.length) {
-      await this.tablerosRepository.deleteById(boardId);
+      await this.deleteBoardCascade(tablero);
       return { ok: true, deleted: true };
     }
 
+    await this.usersService.removeTablero(userId, tablero._id);
     await this.tablerosRepository.removeMiembro(boardId, userOid);
     if (tablero.adminUserId.toString() === userId && remaining[0]) {
       await this.tablerosRepository.setAdmin(boardId, remaining[0]);
     }
 
     return { ok: true, deleted: false };
+  }
+
+  async deleteSharedBoard(userId: string, boardId: string) {
+    const tablero = await this.tablerosRepository.findById(boardId);
+    if (!tablero) throw new NotFoundException('Tablero no encontrado');
+
+    if (tablero.categoria === 'personal') {
+      throw new ForbiddenException('El tablero personal no se puede eliminar');
+    }
+
+    const isMember = tablero.miembros.some((id) => id.toString() === userId);
+    if (!isMember) throw new ForbiddenException('No perteneces a este tablero');
+
+    if (tablero.categoria === 'grupo') {
+      if (tablero.adminUserId.toString() !== userId) {
+        throw new ForbiddenException('Solo el admin puede eliminar el grupo');
+      }
+    }
+
+    await this.deleteBoardCascade(tablero);
+    return { ok: true };
+  }
+
+  private async assertGrupoAdmin(userId: string, boardId: string) {
+    const tablero = await this.tablerosRepository.findById(boardId);
+    if (!tablero) throw new NotFoundException('Tablero no encontrado');
+    if (tablero.categoria !== 'grupo') {
+      throw new BadRequestException('Solo aplica a grupos');
+    }
+    if (tablero.adminUserId.toString() !== userId) {
+      throw new ForbiddenException('Solo el admin puede gestionar el grupo');
+    }
+    return tablero;
+  }
+
+  async addGrupoMiembros(userId: string, boardId: string, contactIds: string[]) {
+    const tablero = await this.assertGrupoAdmin(userId, boardId);
+    const { uniqueIds } = await this.resolveContactMembers(userId, contactIds);
+
+    const already = new Set(tablero.miembros.map((id) => id.toString()));
+    const toAdd = uniqueIds.filter((id) => !already.has(id));
+    if (!toAdd.length) {
+      throw new BadRequestException('Esos contactos ya están en el grupo');
+    }
+
+    for (const id of toAdd) {
+      await this.tablerosRepository.addMiembro(boardId, new Types.ObjectId(id));
+      await this.usersService.addTablero(id, tablero._id);
+    }
+
+    const notifExpires = new Date(Date.now() + DAY_MS);
+    const adminId = new Types.ObjectId(userId);
+    await Promise.all(
+      toAdd.map((id) =>
+        this.usersService.addJoinTableroNotification(
+          id,
+          adminId,
+          tablero._id,
+          tablero.nombre,
+          notifExpires,
+        ),
+      ),
+    );
+
+    return this.getPublicForMember(boardId, userId);
+  }
+
+  async removeGrupoMiembro(adminId: string, boardId: string, memberId: string) {
+    const tablero = await this.assertGrupoAdmin(adminId, boardId);
+
+    if (memberId === adminId) {
+      throw new BadRequestException('Usa Salir para abandonar el grupo');
+    }
+
+    const isMember = tablero.miembros.some((id) => id.toString() === memberId);
+    if (!isMember) throw new NotFoundException('Esa persona no está en el grupo');
+
+    await this.tablerosRepository.removeMiembro(boardId, new Types.ObjectId(memberId));
+    await this.usersService.removeTablero(memberId, tablero._id);
+
+    return this.getPublicForMember(boardId, adminId);
   }
 
   async bumpExpiresAt(boardId: string) {

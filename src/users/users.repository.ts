@@ -53,10 +53,18 @@ export class UsersRepository {
   addNotification(
     userId: string,
     data: {
-      tipo: 'join_tablero' | 'contacto' | 'contacto_aceptado' | 'solicitud_enviada' | 'contacto_nuevo';
+      tipo:
+        | 'join_tablero'
+        | 'contacto'
+        | 'contacto_aceptado'
+        | 'solicitud_enviada'
+        | 'contacto_nuevo'
+        | 'reaccion';
       fromUserId: Types.ObjectId;
       boardId?: Types.ObjectId | null;
       label?: string | null;
+      reaction?: string | null;
+      noteAuthorUsername?: string | null;
       expiresAt: Date;
     },
   ): Promise<UserDocument | null> {
@@ -71,6 +79,8 @@ export class UsersRepository {
               fromUserId: data.fromUserId,
               boardId: data.boardId ?? null,
               label: data.label ?? null,
+              reaction: data.reaction ?? null,
+              noteAuthorUsername: data.noteAuthorUsername ?? null,
               createdAt: new Date(),
               expiresAt: data.expiresAt,
             },
@@ -78,6 +88,40 @@ export class UsersRepository {
         },
         { returnDocument: 'after' },
       )
+      .exec();
+  }
+
+  /** Evita apilar muchas reacciones del mismo user en el mismo tablero. */
+  clearReactionNotifications(
+    userId: string,
+    fromUserId: Types.ObjectId,
+    boardId: Types.ObjectId,
+  ) {
+    return this.userModel
+      .updateOne(
+        { _id: userId },
+        {
+          $pull: {
+            notificaciones: {
+              tipo: 'reaccion',
+              fromUserId,
+              boardId,
+            },
+          },
+        },
+      )
+      .exec();
+  }
+
+  updatePinHash(userId: string, pinHash: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(userId, { $set: { pinHash } }, { returnDocument: 'after' })
+      .exec();
+  }
+
+  updateUsername(userId: string, username: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(userId, { $set: { username } }, { returnDocument: 'after' })
       .exec();
   }
 

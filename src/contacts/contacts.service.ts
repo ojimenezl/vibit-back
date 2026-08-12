@@ -77,6 +77,7 @@ export class ContactsService {
       'solicitud_enviada',
       'contacto_nuevo',
       'join_tablero',
+      'reaccion',
     ]);
 
     return notifs
@@ -88,6 +89,8 @@ export class ContactsService {
         fromUsername: nameMap.get(n.fromUserId.toString()) ?? 'Usuario',
         boardId: n.boardId ? n.boardId.toString() : null,
         label: n.label ?? null,
+        reaction: (n as { reaction?: string | null }).reaction ?? null,
+        noteAuthorUsername: (n as { noteAuthorUsername?: string | null }).noteAuthorUsername ?? null,
         createdAt: n.createdAt,
         expiresAt: n.expiresAt,
       }))
@@ -247,7 +250,8 @@ export class ContactsService {
           n.tipo === 'contacto_aceptado' ||
           n.tipo === 'solicitud_enviada' ||
           n.tipo === 'contacto_nuevo' ||
-          n.tipo === 'join_tablero',
+          n.tipo === 'join_tablero' ||
+          n.tipo === 'reaccion',
       );
       if (dismissible.length === 1) notif = dismissible[0];
     }
@@ -257,7 +261,8 @@ export class ContactsService {
       notif.tipo !== 'contacto_aceptado' &&
       notif.tipo !== 'solicitud_enviada' &&
       notif.tipo !== 'contacto_nuevo' &&
-      notif.tipo !== 'join_tablero'
+      notif.tipo !== 'join_tablero' &&
+      notif.tipo !== 'reaccion'
     ) {
       throw new BadRequestException('Esta notificación no se puede cerrar así');
     }
