@@ -8,6 +8,7 @@ import { Types } from 'mongoose';
 import { TablerosRepository } from './tableros.repository';
 import { UsersService } from '../users/users.service';
 import { ShareDirectaDto } from './dto/share-directa.dto';
+import { CreateGrupoDto } from './dto/create-grupo.dto';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -112,11 +113,8 @@ export class TablerosService {
     });
   }
 
-  async shareDirecta(userId: string, dto: ShareDirectaDto) {
-    const text = dto.text.trim();
-    if (!text) throw new BadRequestException('El texto es obligatorio');
-
-    const uniqueIds = [...new Set(dto.contactIds.map((id) => id.trim()))].filter(
+  private async resolveContactMembers(userId: string, contactIds: string[]) {
+    const uniqueIds = [...new Set(contactIds.map((id) => id.trim()))].filter(
       (id) => id !== userId,
     );
     if (!uniqueIds.length) {
@@ -137,6 +135,18 @@ export class TablerosService {
     if (contacts.length !== uniqueIds.length) {
       throw new NotFoundException('Algún contacto no existe');
     }
+
+    return { me, contacts, uniqueIds };
+  }
+
+  async shareDirecta(userId: string, dto: ShareDirectaDto) {
+    const text = dto.text.trim();
+    if (!text) throw new BadRequestException('El texto es obligatorio');
+
+    const { me, contacts, uniqueIds } = await this.resolveContactMembers(
+      userId,
+      dto.contactIds,
+    );
 
     const adminId = new Types.ObjectId(userId);
     const memberIds = [adminId, ...uniqueIds.map((id) => new Types.ObjectId(id))];
@@ -171,6 +181,90 @@ export class TablerosService {
     };
   }
 
+  async createGrupo(userId: string, dto: CreateGrupoDto) {
+    const nombre = dto.nombre.trim();
+    if (!nombre) throw new BadRequestException('El nombre del grupo es obligatorio');
+
+    const text = dto.text.trim();
+    if (!text) throw new BadRequestException('El texto es obligatorio');
+
+    const { me, contacts, uniqueIds } = await this.resolveContactMembers(
+      userId,
+      dto.contactIds,
+    );
+
+    const adminId = new Types.ObjectId(userId);
+    const memberIds = [adminId, ...uniqueIds.map((id) => new Types.ObjectId(id))];
+
+    const tablero = await this.tablerosRepository.create({
+      nombre,
+      tipoTablero: 'estatico',
+      categoria: 'grupo',
+      adminUserId: adminId,
+      inviteCode: null,
+      miembros: memberIds,
+      solicitudesEntrada: [],
+      expiresAt: null,
+    });
+
+    await Promise.all(
+      memberIds.map((id) => this.usersService.addTablero(id.toString(), tablero._id)),
+    );
+
+    const notifExpires = new Date(Date.now() + DAY_MS);
+    await Promise.all(
+      uniqueIds.map((id) =>
+        this.usersService.addJoinTableroNotification(
+          id,
+          adminId,
+          tablero._id,
+          nombre,
+          notifExpires,
+        ),
+      ),
+    );
+
+    return {
+      tablero: {
+        ...this.tablerosRepository.toPublic(tablero),
+        displayName: nombre,
+        miembrosInfo: [
+          { id: userId, username: me.username },
+          ...contacts.map((c) => ({ id: c._id.toString(), username: c.username })),
+        ],
+      },
+      text,
+    };
+  }
+
+  async leaveGrupo(userId: string, boardId: string) {
+    const tablero = await this.tablerosRepository.findById(boardId);
+    if (!tablero) throw new NotFoundException('Tablero no encontrado');
+    if (tablero.categoria !== 'grupo') {
+      throw new BadRequestException('Solo puedes salir de un grupo');
+    }
+
+    const isMember = tablero.miembros.some((id) => id.toString() === userId);
+    if (!isMember) throw new ForbiddenException('No perteneces a este grupo');
+
+    const userOid = new Types.ObjectId(userId);
+    const remaining = tablero.miembros.filter((id) => id.toString() !== userId);
+
+    await this.usersService.removeTablero(userId, tablero._id);
+
+    if (!remaining.length) {
+      await this.tablerosRepository.deleteById(boardId);
+      return { ok: true, deleted: true };
+    }
+
+    await this.tablerosRepository.removeMiembro(boardId, userOid);
+    if (tablero.adminUserId.toString() === userId && remaining[0]) {
+      await this.tablerosRepository.setAdmin(boardId, remaining[0]);
+    }
+
+    return { ok: true, deleted: false };
+  }
+
   async bumpExpiresAt(boardId: string) {
     return this.tablerosRepository.touchExpiresAt(
       boardId,
@@ -180,8 +274,8 @@ export class TablerosService {
 
   async rename(userId: string, boardId: string, nombre: string) {
     const tablero = await this.getByIdForMember(boardId, userId);
-    if (tablero.categoria !== 'personal') {
-      throw new ForbiddenException('Solo el tablero personal se puede renombrar');
+    if (tablero.categoria !== 'personal' && tablero.categoria !== 'grupo') {
+      throw new ForbiddenException('Este tablero no se puede renombrar');
     }
     if (tablero.adminUserId.toString() !== userId) {
       throw new ForbiddenException('Solo el admin puede renombrar el tablero');

@@ -31,7 +31,10 @@ export class NotasService {
       throw new BadRequestException('El texto es obligatorio');
     }
 
-    const tipoNota = tablero.categoria === 'personal' ? 'estatico' : 'efimero';
+    const tipoNota =
+      tablero.categoria === 'personal' || tablero.categoria === 'grupo'
+        ? 'estatico'
+        : 'efimero';
     const expiresAt =
       tipoNota === 'efimero' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
 
@@ -47,8 +50,10 @@ export class NotasService {
       deletedAt: null,
     });
 
-    if (tablero.categoria !== 'personal') {
+    if (tablero.categoria === 'directa') {
       await this.tablerosService.bumpExpiresAt(boardId);
+    }
+    if (tablero.categoria !== 'personal') {
       await this.usersService.markWidgetBoardSeen(userId, boardId);
     }
 

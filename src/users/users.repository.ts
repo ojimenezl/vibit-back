@@ -40,6 +40,47 @@ export class UsersRepository {
       .exec();
   }
 
+  removeTablero(userId: string, tableroId: Types.ObjectId): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $pull: { idTableros: tableroId } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  addNotification(
+    userId: string,
+    data: {
+      tipo: 'join_tablero' | 'contacto' | 'contacto_aceptado' | 'solicitud_enviada' | 'contacto_nuevo';
+      fromUserId: Types.ObjectId;
+      boardId?: Types.ObjectId | null;
+      label?: string | null;
+      expiresAt: Date;
+    },
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $push: {
+            notificaciones: {
+              _id: new Types.ObjectId(),
+              tipo: data.tipo,
+              fromUserId: data.fromUserId,
+              boardId: data.boardId ?? null,
+              label: data.label ?? null,
+              createdAt: new Date(),
+              expiresAt: data.expiresAt,
+            },
+          },
+        },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
   async markWidgetBoardSeen(userId: string, boardId: string, at = new Date()) {
     const oid = new Types.ObjectId(boardId);
     const updated = await this.userModel

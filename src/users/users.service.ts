@@ -29,6 +29,26 @@ export class UsersService {
     return this.usersRepository.addTablero(userId, tableroId);
   }
 
+  removeTablero(userId: string, tableroId: Types.ObjectId) {
+    return this.usersRepository.removeTablero(userId, tableroId);
+  }
+
+  addJoinTableroNotification(
+    userId: string,
+    fromUserId: Types.ObjectId,
+    boardId: Types.ObjectId,
+    label: string,
+    expiresAt: Date,
+  ) {
+    return this.usersRepository.addNotification(userId, {
+      tipo: 'join_tablero',
+      fromUserId,
+      boardId,
+      label,
+      expiresAt,
+    });
+  }
+
   findByIds(ids: string[]) {
     return this.usersRepository.findByIds(ids);
   }

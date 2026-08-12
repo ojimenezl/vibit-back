@@ -21,6 +21,12 @@ export class Notificacion {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   fromUserId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Tablero', default: null })
+  boardId: Types.ObjectId | null;
+
+  @Prop({ type: String, default: null })
+  label: string | null;
+
   @Prop({ type: Date, default: Date.now })
   createdAt: Date;
 

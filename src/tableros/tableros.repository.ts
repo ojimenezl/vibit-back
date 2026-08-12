@@ -70,6 +70,30 @@ export class TablerosRepository {
       .exec();
   }
 
+  removeMiembro(tableroId: string, userId: Types.ObjectId) {
+    return this.tableroModel
+      .findByIdAndUpdate(
+        tableroId,
+        { $pull: { miembros: userId } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  setAdmin(tableroId: string, adminUserId: Types.ObjectId) {
+    return this.tableroModel
+      .findByIdAndUpdate(
+        tableroId,
+        { $set: { adminUserId } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  deleteById(tableroId: string) {
+    return this.tableroModel.findByIdAndDelete(tableroId).exec();
+  }
+
   toPublic(tablero: TableroDocument) {
     return {
       id: tablero._id.toString(),

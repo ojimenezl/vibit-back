@@ -13,6 +13,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { TablerosService } from './tableros.service';
 import { UpdateTableroDto } from './dto/update-tablero.dto';
 import { ShareDirectaDto } from './dto/share-directa.dto';
+import { CreateGrupoDto } from './dto/create-grupo.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayloadUser } from '../common/decorators/current-user.decorator';
 import { NotasService } from '../notas/notas.service';
@@ -44,6 +45,21 @@ export class TablerosController {
       text: created.text,
     });
     return { tablero: created.tablero, nota };
+  }
+
+  @Post('grupo')
+  async createGrupo(@CurrentUser() user: JwtPayloadUser, @Body() dto: CreateGrupoDto) {
+    const created = await this.tablerosService.createGrupo(user.userId, dto);
+    const nota = await this.notasService.create(user.userId, created.tablero.id, {
+      type: 'text',
+      text: created.text,
+    });
+    return { tablero: created.tablero, nota };
+  }
+
+  @Post(':id/leave')
+  leave(@CurrentUser() user: JwtPayloadUser, @Param('id') id: string) {
+    return this.tablerosService.leaveGrupo(user.userId, id);
   }
 
   @Get(':id')
