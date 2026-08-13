@@ -16,6 +16,7 @@ import { UpdateTableroDto } from './dto/update-tablero.dto';
 import { ShareDirectaDto } from './dto/share-directa.dto';
 import { CreateGrupoDto } from './dto/create-grupo.dto';
 import { AddGrupoMiembrosDto } from './dto/add-grupo-miembros.dto';
+import { TransferGrupoAdminDto } from './dto/transfer-grupo-admin.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayloadUser } from '../common/decorators/current-user.decorator';
 import { NotasService } from '../notas/notas.service';
@@ -86,6 +87,15 @@ export class TablerosController {
     @Param('memberId') memberId: string,
   ) {
     return this.tablerosService.removeGrupoMiembro(user.userId, id, memberId);
+  }
+
+  @Patch(':id/admin')
+  transferAdmin(
+    @CurrentUser() user: JwtPayloadUser,
+    @Param('id') id: string,
+    @Body() dto: TransferGrupoAdminDto,
+  ) {
+    return this.tablerosService.transferGrupoAdmin(user.userId, id, dto.memberId);
   }
 
   @Delete(':id')

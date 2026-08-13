@@ -70,9 +70,12 @@ export class TablerosService {
     const memberUsers = await this.usersService.findByIds(
       tablero.miembros.map((id) => id.toString()),
     );
-    const miembrosInfo = memberUsers.map((u) => ({
-      id: u._id.toString(),
-      username: u.username,
+    const userMap = new Map(
+      memberUsers.map((u) => [u._id.toString(), u.username]),
+    );
+    const miembrosInfo = tablero.miembros.map((id) => ({
+      id: id.toString(),
+      username: userMap.get(id.toString()) ?? 'Usuario',
     }));
 
     return {
@@ -80,6 +83,15 @@ export class TablerosService {
       displayName: this.displayNameForUser(tablero, userId, miembrosInfo),
       miembrosInfo,
     };
+  }
+
+  /** Join order: creator first, then members as they were added. */
+  private pickOldestRemainingMember(
+    miembros: Types.ObjectId[],
+    leavingUserId: string,
+  ): Types.ObjectId | null {
+    const remaining = miembros.filter((id) => id.toString() !== leavingUserId);
+    return remaining[0] ?? null;
   }
 
   private displayNameForUser(
@@ -286,8 +298,11 @@ export class TablerosService {
 
     await this.usersService.removeTablero(userId, tablero._id);
     await this.tablerosRepository.removeMiembro(boardId, userOid);
-    if (tablero.adminUserId.toString() === userId && remaining[0]) {
-      await this.tablerosRepository.setAdmin(boardId, remaining[0]);
+    if (tablero.adminUserId.toString() === userId) {
+      const nextAdmin = this.pickOldestRemainingMember(tablero.miembros, userId);
+      if (nextAdmin) {
+        await this.tablerosRepository.setAdmin(boardId, nextAdmin);
+      }
     }
 
     return { ok: true, deleted: false };
@@ -307,6 +322,15 @@ export class TablerosService {
     if (tablero.categoria === 'grupo') {
       if (tablero.adminUserId.toString() !== userId) {
         throw new ForbiddenException('Solo el admin puede eliminar el grupo');
+      }
+    }
+
+    // Antes: en directa cualquier miembro podía eliminar
+    // if (tablero.categoria === 'directa') { /* sin chequeo de admin */ }
+    // Solo el creador (admin oculto) puede eliminar la tabla efímera
+    if (tablero.categoria === 'directa') {
+      if (tablero.adminUserId.toString() !== userId) {
+        throw new ForbiddenException('Solo quien creó la nota puede eliminar este tablero');
       }
     }
 
@@ -377,6 +401,22 @@ export class TablerosService {
     this.realtimeService.emitBoardRemoved([memberId], boardId);
 
     return this.getPublicForMember(boardId, adminId);
+  }
+
+  async transferGrupoAdmin(userId: string, boardId: string, newAdminId: string) {
+    const tablero = await this.assertGrupoAdmin(userId, boardId);
+
+    if (newAdminId === userId) {
+      throw new BadRequestException('Ya eres el admin del grupo');
+    }
+
+    const isMember = tablero.miembros.some((id) => id.toString() === newAdminId);
+    if (!isMember) {
+      throw new NotFoundException('Esa persona no está en el grupo');
+    }
+
+    await this.tablerosRepository.setAdmin(boardId, new Types.ObjectId(newAdminId));
+    return this.getPublicForMember(boardId, userId);
   }
 
   async bumpExpiresAt(boardId: string) {
