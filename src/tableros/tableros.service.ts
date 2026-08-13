@@ -94,7 +94,8 @@ export class TablerosService {
     return remaining[0] ?? null;
   }
 
-  private displayNameForUser(
+  /** Public so widget feed uses the same naming rules as Home. */
+  displayNameForUser(
     tablero: { categoria: string; nombre: string; adminUserId: Types.ObjectId | string },
     userId: string,
     miembrosInfo: { id: string; username: string }[],
@@ -179,11 +180,11 @@ export class TablerosService {
 
     const adminId = new Types.ObjectId(userId);
     const memberIds = [adminId, ...uniqueIds.map((id) => new Types.ObjectId(id))];
-    const nombres = [me.username, ...contacts.map((c) => c.username)];
+    // Guardar solo el creador: evita que fallbacks muestren "A · B · C" a receptores.
     const expiresAt = new Date(Date.now() + DAY_MS);
 
     const tablero = await this.tablerosRepository.create({
-      nombre: nombres.join(' · '),
+      nombre: me.username,
       tipoTablero: 'efimero',
       categoria: 'directa',
       adminUserId: adminId,
