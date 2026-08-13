@@ -21,6 +21,7 @@ export type NoteCreatedPayload = {
 };
 
 export type ReactionCounts = {
+  like: number;
   heart: number;
   laugh: number;
   wow: number;

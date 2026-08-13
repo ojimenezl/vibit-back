@@ -42,7 +42,7 @@ export class WidgetService {
       authorUsername: string;
       isPersonal: boolean;
       isUnseen: boolean;
-      reactionCounts: { heart: number; laugh: number; wow: number };
+      reactionCounts: { like: number; heart: number; laugh: number; wow: number };
       myReaction: string | null;
       createdAt?: Date;
     }> = [];

@@ -93,9 +93,9 @@ export class NotasRepository {
       }
     }
 
-    const reactionCounts = { heart: 0, laugh: 0, wow: 0 };
+    const reactionCounts = { like: 0, heart: 0, laugh: 0, wow: 0 };
     for (const type of Object.values(reactions)) {
-      if (type === 'heart' || type === 'laugh' || type === 'wow') {
+      if (type === 'like' || type === 'heart' || type === 'laugh' || type === 'wow') {
         reactionCounts[type] += 1;
       }
     }

@@ -37,7 +37,7 @@ export class Notificacion {
   @Prop({ type: String, default: null })
   label: string | null;
 
-  /** heart | laugh | wow */
+  /** like | heart | laugh | wow */
   @Prop({ type: String, default: null })
   reaction: string | null;
 
