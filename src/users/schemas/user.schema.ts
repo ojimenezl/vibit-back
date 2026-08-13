@@ -12,6 +12,7 @@ export class Notificacion {
     enum: [
       'contacto',
       'join_tablero',
+      'nota_directa',
       'contacto_aceptado',
       'solicitud_enviada',
       'contacto_nuevo',
@@ -21,6 +22,7 @@ export class Notificacion {
   tipo:
     | 'contacto'
     | 'join_tablero'
+    | 'nota_directa'
     | 'contacto_aceptado'
     | 'solicitud_enviada'
     | 'contacto_nuevo'

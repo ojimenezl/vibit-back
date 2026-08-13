@@ -2,10 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Types } from 'mongoose';
 import { UsersRepository } from './users.repository';
 import { UserDocument } from './schemas/user.schema';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly realtimeService: RealtimeService,
+  ) {}
 
   create(data: Partial<UserDocument>) {
     return this.usersRepository.create(data);
@@ -33,20 +37,37 @@ export class UsersService {
     return this.usersRepository.removeTablero(userId, tableroId);
   }
 
-  addJoinTableroNotification(
+  async addJoinTableroNotification(
     userId: string,
     fromUserId: Types.ObjectId,
     boardId: Types.ObjectId,
     label: string,
     expiresAt: Date,
   ) {
-    return this.usersRepository.addNotification(userId, {
+    await this.usersRepository.addNotification(userId, {
       tipo: 'join_tablero',
       fromUserId,
       boardId,
       label,
       expiresAt,
     });
+    this.realtimeService.emitNotificationNew(userId);
+  }
+
+  async addDirectaNotaNotification(
+    userId: string,
+    fromUserId: Types.ObjectId,
+    boardId: Types.ObjectId,
+    expiresAt: Date,
+  ) {
+    await this.usersRepository.addNotification(userId, {
+      tipo: 'nota_directa',
+      fromUserId,
+      boardId,
+      label: null,
+      expiresAt,
+    });
+    this.realtimeService.emitNotificationNew(userId);
   }
 
   async notifyReaction(data: {
@@ -74,6 +95,7 @@ export class UsersService {
           noteAuthorUsername: data.noteAuthorUsername,
           expiresAt,
         });
+        this.realtimeService.emitNotificationNew(recipientId);
       }),
     );
   }

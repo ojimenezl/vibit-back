@@ -11,6 +11,7 @@ import { NotasRepository } from '../notas/notas.repository';
 import { ShareDirectaDto } from './dto/share-directa.dto';
 import { CreateGrupoDto } from './dto/create-grupo.dto';
 import { TableroDocument } from './schemas/tablero.schema';
+import { RealtimeService } from '../realtime/realtime.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -20,6 +21,7 @@ export class TablerosService {
     private readonly tablerosRepository: TablerosRepository,
     private readonly usersService: UsersService,
     private readonly notasRepository: NotasRepository,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async createPersonal(userId: string, username: string) {
@@ -171,6 +173,18 @@ export class TablerosService {
       memberIds.map((id) => this.usersService.addTablero(id.toString(), tablero._id)),
     );
 
+    const notifExpires = new Date(Date.now() + DAY_MS);
+    await Promise.all(
+      uniqueIds.map((id) =>
+        this.usersService.addDirectaNotaNotification(
+          id,
+          adminId,
+          tablero._id,
+          notifExpires,
+        ),
+      ),
+    );
+
     return {
       tablero: {
         ...this.tablerosRepository.toPublic(tablero),
@@ -296,7 +310,9 @@ export class TablerosService {
       }
     }
 
+    const memberIds = tablero.miembros.map((id) => id.toString());
     await this.deleteBoardCascade(tablero);
+    this.realtimeService.emitBoardRemoved(memberIds, boardId, userId);
     return { ok: true };
   }
 
@@ -341,6 +357,8 @@ export class TablerosService {
       ),
     );
 
+    this.realtimeService.emitBoardCreated(toAdd, tablero._id.toString());
+
     return this.getPublicForMember(boardId, userId);
   }
 
@@ -356,6 +374,7 @@ export class TablerosService {
 
     await this.tablerosRepository.removeMiembro(boardId, new Types.ObjectId(memberId));
     await this.usersService.removeTablero(memberId, tablero._id);
+    this.realtimeService.emitBoardRemoved([memberId], boardId);
 
     return this.getPublicForMember(boardId, adminId);
   }

@@ -11,6 +11,7 @@ import { WidgetModule } from './widget/widget.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { HealthController } from './health/health.controller';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HealthController } from './health/health.controller';
     ContactsModule,
     WidgetModule,
     AuthModule,
+    RealtimeModule,
   ],
   controllers: [HealthController],
   providers: [

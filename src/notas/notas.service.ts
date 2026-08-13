@@ -11,6 +11,7 @@ import { UsersService } from '../users/users.service';
 import { CreateNotaDto } from './dto/create-nota.dto';
 import { UpdateNotaDto } from './dto/update-nota.dto';
 import { ReactNotaDto, REACTION_TYPES } from './dto/react-nota.dto';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Injectable()
 export class NotasService {
@@ -18,10 +19,23 @@ export class NotasService {
     private readonly notasRepository: NotasRepository,
     private readonly tablerosService: TablerosService,
     private readonly usersService: UsersService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async create(userId: string, boardId: string, dto: CreateNotaDto) {
     const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
+
+    // Tablero efímero (directa): solo el creador puede publicar notas adicionales.
+    // Los demás miembros solo ven y reaccionan — no es un chat de notas.
+    // FUTURO: quitar este bloque si queremos que cualquier miembro publique en efímeros.
+    if (
+      tablero.categoria === 'directa' &&
+      tablero.adminUserId.toString() !== userId
+    ) {
+      throw new ForbiddenException(
+        'En una nota directa solo quien la envió puede publicar más notas',
+      );
+    }
 
     if (dto.type !== 'text') {
       throw new BadRequestException('De momento solo se admiten notas de texto');
@@ -58,7 +72,18 @@ export class NotasService {
       await this.usersService.markWidgetBoardSeen(userId, boardId);
     }
 
-    return this.notasRepository.toPublic(nota, userId);
+    const publicNota = this.notasRepository.toPublic(nota, userId);
+
+    if (tablero.categoria !== 'personal') {
+      this.realtimeService.emitNoteCreated(
+        tablero.miembros.map((id) => id.toString()),
+        boardId,
+        publicNota,
+        userId,
+      );
+    }
+
+    return publicNota;
   }
 
   async listByBoard(userId: string, boardId: string) {
@@ -162,6 +187,16 @@ export class NotasService {
       }
     }
 
-    return this.notasRepository.toPublic(updated, userId);
+    const publicNota = this.notasRepository.toPublic(updated, userId);
+    this.realtimeService.emitReactionUpdated(
+      tablero.miembros.map((id) => id.toString()),
+      boardId,
+      notaId,
+      userId,
+      next,
+      publicNota.reactionCounts,
+    );
+
+    return publicNota;
   }
 }

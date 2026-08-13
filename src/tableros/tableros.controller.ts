@@ -19,6 +19,7 @@ import { AddGrupoMiembrosDto } from './dto/add-grupo-miembros.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayloadUser } from '../common/decorators/current-user.decorator';
 import { NotasService } from '../notas/notas.service';
+import { RealtimeService } from '../realtime/realtime.service';
 
 @Controller('tableros')
 @UseGuards(AuthGuard('jwt'))
@@ -27,6 +28,7 @@ export class TablerosController {
     private readonly tablerosService: TablerosService,
     @Inject(forwardRef(() => NotasService))
     private readonly notasService: NotasService,
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   @Get('personal')
@@ -46,6 +48,7 @@ export class TablerosController {
       type: 'text',
       text: created.text,
     });
+    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id, user.userId);
     return { tablero: created.tablero, nota };
   }
 
@@ -56,6 +59,7 @@ export class TablerosController {
       type: 'text',
       text: created.text,
     });
+    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id, user.userId);
     return { tablero: created.tablero, nota };
   }
 

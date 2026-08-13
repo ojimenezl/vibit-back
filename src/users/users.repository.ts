@@ -55,6 +55,7 @@ export class UsersRepository {
     data: {
       tipo:
         | 'join_tablero'
+        | 'nota_directa'
         | 'contacto'
         | 'contacto_aceptado'
         | 'solicitud_enviada'

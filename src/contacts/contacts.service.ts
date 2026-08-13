@@ -7,12 +7,16 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { ContactsRepository } from './contacts.repository';
+import { RealtimeService } from '../realtime/realtime.service';
 
 const NOTIF_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly contactsRepository: ContactsRepository) {}
+  constructor(
+    private readonly contactsRepository: ContactsRepository,
+    private readonly realtimeService: RealtimeService,
+  ) {}
 
   private expiresIn24h() {
     return new Date(Date.now() + NOTIF_TTL_MS);
@@ -77,6 +81,7 @@ export class ContactsService {
       'solicitud_enviada',
       'contacto_nuevo',
       'join_tablero',
+      'nota_directa',
       'reaccion',
     ]);
 
@@ -145,6 +150,7 @@ export class ContactsService {
       new Types.ObjectId(requesterId),
       expires,
     );
+    this.realtimeService.emitNotificationNew(target._id.toString());
 
     // A: confirmación de envío (fromUserId = destino)
     await this.contactsRepository.addNotification(
@@ -153,6 +159,7 @@ export class ContactsService {
       target._id,
       expires,
     );
+    this.realtimeService.emitNotificationNew(requesterId);
 
     return {
       ok: true,
@@ -196,6 +203,7 @@ export class ContactsService {
       new Types.ObjectId(userId),
       expires,
     );
+    this.realtimeService.emitNotificationNew(requesterId);
 
     // B: nuevo contacto confirmado
     await this.contactsRepository.addNotification(
@@ -204,6 +212,7 @@ export class ContactsService {
       new Types.ObjectId(requesterId),
       expires,
     );
+    this.realtimeService.emitNotificationNew(userId);
 
     const requester = await this.contactsRepository.findById(requesterId);
     return {
@@ -251,6 +260,7 @@ export class ContactsService {
           n.tipo === 'solicitud_enviada' ||
           n.tipo === 'contacto_nuevo' ||
           n.tipo === 'join_tablero' ||
+          n.tipo === 'nota_directa' ||
           n.tipo === 'reaccion',
       );
       if (dismissible.length === 1) notif = dismissible[0];
@@ -262,6 +272,7 @@ export class ContactsService {
       notif.tipo !== 'solicitud_enviada' &&
       notif.tipo !== 'contacto_nuevo' &&
       notif.tipo !== 'join_tablero' &&
+      notif.tipo !== 'nota_directa' &&
       notif.tipo !== 'reaccion'
     ) {
       throw new BadRequestException('Esta notificación no se puede cerrar así');
