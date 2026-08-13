@@ -58,15 +58,25 @@ export class WidgetService {
         : await this.notasRepository.findActiveByBoard(board._id.toString());
 
       const isPersonal = board.categoria === 'personal';
-      const displayName = isPersonal
-        ? 'Mi tablero'
-        : board.categoria === 'grupo'
-          ? board.nombre
-          : board.miembros
+      // Efímero: creador ve destinatarios; receptor ve al creador.
+      let displayName: string;
+      if (isPersonal) {
+        displayName = 'Mi tablero';
+      } else if (board.categoria === 'grupo') {
+        displayName = board.nombre;
+      } else {
+        const adminId = board.adminUserId.toString();
+        if (userId === adminId) {
+          displayName =
+            board.miembros
               .map((id) => id.toString())
               .filter((id) => id !== userId)
               .map((id) => usernameMap.get(id) ?? 'Usuario')
               .join(' · ') || board.nombre;
+        } else {
+          displayName = usernameMap.get(adminId) ?? board.nombre;
+        }
+      }
 
       const lastSeen = seenMap.get(board._id.toString());
 

@@ -95,18 +95,30 @@ export class TablerosService {
   }
 
   private displayNameForUser(
-    tablero: { categoria: string; nombre: string },
+    tablero: { categoria: string; nombre: string; adminUserId: Types.ObjectId | string },
     userId: string,
     miembrosInfo: { id: string; username: string }[],
   ) {
     if (tablero.categoria === 'personal') return 'Mi tablero';
     if (tablero.categoria === 'grupo') return tablero.nombre;
 
-    const others = miembrosInfo
-      .filter((m) => m.id !== userId)
-      .map((m) => m.username);
-    if (others.length) return others.join(' · ');
-    return tablero.nombre;
+    // Efímero: solo el creador ve los nombres de los destinatarios.
+    // Los receptores ven el nombre de quien envió la nota.
+    const adminId =
+      typeof tablero.adminUserId === 'string'
+        ? tablero.adminUserId
+        : tablero.adminUserId.toString();
+
+    if (userId === adminId) {
+      const others = miembrosInfo
+        .filter((m) => m.id !== userId)
+        .map((m) => m.username);
+      if (others.length) return others.join(' · ');
+      return tablero.nombre;
+    }
+
+    const creator = miembrosInfo.find((m) => m.id === adminId);
+    return creator?.username ?? tablero.nombre;
   }
 
   async listShared(userId: string) {
