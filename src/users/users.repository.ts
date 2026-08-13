@@ -30,6 +30,22 @@ export class UsersRepository {
       .exec();
   }
 
+  addFcmToken(userId: string, token: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $addToSet: { fcmTokens: token } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
+  removeFcmToken(token: string) {
+    return this.userModel
+      .updateMany({ fcmTokens: token }, { $pull: { fcmTokens: token } })
+      .exec();
+  }
+
   addTablero(userId: string, tableroId: Types.ObjectId): Promise<UserDocument | null> {
     return this.userModel
       .findByIdAndUpdate(

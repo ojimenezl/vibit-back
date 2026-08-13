@@ -104,6 +104,17 @@ export class UsersService {
     return this.usersRepository.findByIds(ids);
   }
 
+  async registerFcmToken(userId: string, token: string) {
+    const trimmed = token.trim();
+    if (!trimmed) throw new BadRequestException('Token FCM inválido');
+    await this.usersRepository.addFcmToken(userId, trimmed);
+    return { ok: true };
+  }
+
+  removeFcmToken(token: string) {
+    return this.usersRepository.removeFcmToken(token);
+  }
+
   markWidgetBoardSeen(userId: string, boardId: string, at = new Date()) {
     return this.usersRepository.markWidgetBoardSeen(userId, boardId, at);
   }

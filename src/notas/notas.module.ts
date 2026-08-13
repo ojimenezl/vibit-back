@@ -7,6 +7,7 @@ import { NotasController } from './notas.controller';
 import { TablerosModule } from '../tableros/tableros.module';
 import { UsersModule } from '../users/users.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
     forwardRef(() => TablerosModule),
     UsersModule,
     RealtimeModule,
+    PushModule,
   ],
   controllers: [NotasController],
   providers: [NotasRepository, NotasService],

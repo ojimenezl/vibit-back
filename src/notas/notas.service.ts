@@ -12,6 +12,7 @@ import { CreateNotaDto } from './dto/create-nota.dto';
 import { UpdateNotaDto } from './dto/update-nota.dto';
 import { ReactNotaDto, REACTION_TYPES } from './dto/react-nota.dto';
 import { RealtimeService } from '../realtime/realtime.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class NotasService {
@@ -20,6 +21,7 @@ export class NotasService {
     private readonly tablerosService: TablerosService,
     private readonly usersService: UsersService,
     private readonly realtimeService: RealtimeService,
+    private readonly pushService: PushService,
   ) {}
 
   async create(userId: string, boardId: string, dto: CreateNotaDto) {
@@ -79,6 +81,10 @@ export class NotasService {
         tablero.miembros.map((id) => id.toString()),
         boardId,
         publicNota,
+        userId,
+      );
+      void this.pushService.notifyWidgetSync(
+        tablero.miembros.map((id) => id.toString()),
         userId,
       );
     }

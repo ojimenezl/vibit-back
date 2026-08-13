@@ -1,14 +1,19 @@
+# Env
+.env
+.env.local
+.env.*.local
+
+# Firebase service account (never commit)
+secrets/
+*firebase-adminsdk*.json
+*adminsdk*.json
+
 # Dependencies
 node_modules/
 
 # Build
 dist/
 coverage/
-
-# Env
-.env
-.env.local
-.env.*.local
 
 # Logs
 *.log
