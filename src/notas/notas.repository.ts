@@ -59,6 +59,19 @@ export class NotasRepository {
       .exec();
   }
 
+  updateMedia(
+    id: string,
+    media: { url: string; mimeType: string; width: number | null; height: number | null }[],
+  ): Promise<NotaDocument | null> {
+    return this.notaModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { media, text: null } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
   setReaction(
     id: string,
     userId: string,

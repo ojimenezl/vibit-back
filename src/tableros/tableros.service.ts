@@ -170,8 +170,16 @@ export class TablerosService {
   }
 
   async shareDirecta(userId: string, dto: ShareDirectaDto) {
-    const text = dto.text.trim();
-    if (!text) throw new BadRequestException('El texto es obligatorio');
+    const type = dto.type === 'draw' ? 'draw' : 'text';
+    const text = type === 'text' ? dto.text?.trim() ?? '' : '';
+    const imageDataUrl = type === 'draw' ? dto.imageDataUrl?.trim() ?? '' : '';
+
+    if (type === 'text' && !text) {
+      throw new BadRequestException('El texto es obligatorio');
+    }
+    if (type === 'draw' && !imageDataUrl) {
+      throw new BadRequestException('El dibujo es obligatorio');
+    }
 
     const { me, contacts, uniqueIds } = await this.resolveContactMembers(
       userId,
@@ -219,7 +227,9 @@ export class TablerosService {
           ...contacts.map((c) => ({ id: c._id.toString(), username: c.username })),
         ],
       },
-      text,
+      type,
+      text: type === 'text' ? text : null,
+      imageDataUrl: type === 'draw' ? imageDataUrl : null,
     };
   }
 
@@ -227,8 +237,16 @@ export class TablerosService {
     const nombre = dto.nombre.trim();
     if (!nombre) throw new BadRequestException('El nombre del grupo es obligatorio');
 
-    const text = dto.text.trim();
-    if (!text) throw new BadRequestException('El texto es obligatorio');
+    const type = dto.type === 'draw' ? 'draw' : 'text';
+    const text = type === 'text' ? dto.text?.trim() ?? '' : '';
+    const imageDataUrl = type === 'draw' ? dto.imageDataUrl?.trim() ?? '' : '';
+
+    if (type === 'text' && !text) {
+      throw new BadRequestException('El texto es obligatorio');
+    }
+    if (type === 'draw' && !imageDataUrl) {
+      throw new BadRequestException('El dibujo es obligatorio');
+    }
 
     const { me, contacts, uniqueIds } = await this.resolveContactMembers(
       userId,
@@ -275,7 +293,9 @@ export class TablerosService {
           ...contacts.map((c) => ({ id: c._id.toString(), username: c.username })),
         ],
       },
-      text,
+      type,
+      text: type === 'text' ? text : null,
+      imageDataUrl: type === 'draw' ? imageDataUrl : null,
     };
   }
 

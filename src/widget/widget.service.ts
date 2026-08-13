@@ -38,7 +38,9 @@ export class WidgetService {
       boardId: string;
       boardName: string;
       boardCategoria: string;
+      type: 'text' | 'draw';
       text: string;
+      imageDataUrl: string | null;
       authorUsername: string;
       isPersonal: boolean;
       isUnseen: boolean;
@@ -71,20 +73,43 @@ export class WidgetService {
       const lastSeen = seenMap.get(board._id.toString());
 
       for (const nota of notas) {
-        if (nota.type !== 'text' || !nota.text) continue;
+        if (nota.type === 'photo') continue;
+
+        const publicNota = this.notasRepository.toPublic(nota, userId);
+        let text = '';
+        let imageDataUrl: string | null = null;
+        let type: 'text' | 'draw' = 'text';
+
+        if (nota.type === 'draw') {
+          const mediaUrl =
+            Array.isArray(publicNota.media) && publicNota.media[0]?.url
+              ? String(publicNota.media[0].url)
+              : '';
+          if (!mediaUrl) continue;
+          type = 'draw';
+          text = '✎ Dibujo';
+          imageDataUrl = mediaUrl;
+        } else if (nota.type === 'text' && nota.text) {
+          type = 'text';
+          text = nota.text;
+        } else {
+          continue;
+        }
+
         const createdAt = (nota as { createdAt?: Date }).createdAt;
         const isUnseen =
           !isPersonal &&
           (!lastSeen || (createdAt ? createdAt.getTime() > lastSeen.getTime() : true));
         if (isUnseen) hasUnseen = true;
 
-        const publicNota = this.notasRepository.toPublic(nota, userId);
         pages.push({
           id: nota._id.toString(),
           boardId: board._id.toString(),
           boardName: displayName,
           boardCategoria: board.categoria,
-          text: nota.text,
+          type,
+          text,
+          imageDataUrl,
           authorUsername: usernameMap.get(nota.authorId.toString()) ?? 'Usuario',
           isPersonal,
           isUnseen,

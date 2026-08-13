@@ -14,6 +14,21 @@ import { ReactNotaDto, REACTION_TYPES } from './dto/react-nota.dto';
 import { RealtimeService } from '../realtime/realtime.service';
 import { PushService } from '../push/push.service';
 
+function mediaFromDataUrl(imageDataUrl: string) {
+  const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,/i.exec(imageDataUrl);
+  if (!match) {
+    throw new BadRequestException('Imagen de dibujo no válida');
+  }
+  let mimeType = match[1].toLowerCase();
+  if (mimeType === 'image/jpg') mimeType = 'image/jpeg';
+  return {
+    url: imageDataUrl,
+    mimeType,
+    width: null as number | null,
+    height: null as number | null,
+  };
+}
+
 @Injectable()
 export class NotasService {
   constructor(
@@ -39,13 +54,8 @@ export class NotasService {
       );
     }
 
-    if (dto.type !== 'text') {
-      throw new BadRequestException('De momento solo se admiten notas de texto');
-    }
-
-    const text = dto.text?.trim();
-    if (!text) {
-      throw new BadRequestException('El texto es obligatorio');
+    if (dto.type === 'photo') {
+      throw new BadRequestException('Las notas de foto llegarán pronto');
     }
 
     const tipoNota =
@@ -55,13 +65,32 @@ export class NotasService {
     const expiresAt =
       tipoNota === 'efimero' ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
 
+    let text: string | null = null;
+    let media: ReturnType<typeof mediaFromDataUrl>[] = [];
+    let type: 'text' | 'draw' = 'text';
+
+    if (dto.type === 'draw') {
+      if (!dto.imageDataUrl?.trim()) {
+        throw new BadRequestException('El dibujo es obligatorio');
+      }
+      type = 'draw';
+      media = [mediaFromDataUrl(dto.imageDataUrl.trim())];
+    } else {
+      const trimmed = dto.text?.trim();
+      if (!trimmed) {
+        throw new BadRequestException('El texto es obligatorio');
+      }
+      type = 'text';
+      text = trimmed;
+    }
+
     const nota = await this.notasRepository.create({
       authorId: new Types.ObjectId(userId),
       boardId: new Types.ObjectId(boardId),
-      type: 'text',
+      type,
       tipoNota,
       text,
-      media: [],
+      media,
       reactions: new Map(),
       expiresAt,
       deletedAt: null,
@@ -107,16 +136,26 @@ export class NotasService {
     if (nota.authorId.toString() !== userId) {
       throw new ForbiddenException('Solo puedes editar tus propias notas');
     }
-    if (nota.type !== 'text') {
-      throw new BadRequestException('De momento solo se editan notas de texto');
+
+    if (nota.type === 'text') {
+      const text = dto.text?.trim();
+      if (!text) throw new BadRequestException('El texto es obligatorio');
+      const updated = await this.notasRepository.updateText(notaId, text);
+      if (!updated) throw new NotFoundException('Nota no encontrada');
+      return this.notasRepository.toPublic(updated, userId);
     }
 
-    const text = dto.text.trim();
-    if (!text) throw new BadRequestException('El texto es obligatorio');
+    if (nota.type === 'draw') {
+      const imageDataUrl = dto.imageDataUrl?.trim();
+      if (!imageDataUrl) throw new BadRequestException('El dibujo es obligatorio');
+      const updated = await this.notasRepository.updateMedia(notaId, [
+        mediaFromDataUrl(imageDataUrl),
+      ]);
+      if (!updated) throw new NotFoundException('Nota no encontrada');
+      return this.notasRepository.toPublic(updated, userId);
+    }
 
-    const updated = await this.notasRepository.updateText(notaId, text);
-    if (!updated) throw new NotFoundException('Nota no encontrada');
-    return this.notasRepository.toPublic(updated, userId);
+    throw new BadRequestException('Este tipo de nota no se puede editar aún');
   }
 
   async softDelete(userId: string, boardId: string, notaId: string) {

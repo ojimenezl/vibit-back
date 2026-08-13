@@ -45,10 +45,16 @@ export class TablerosController {
   @Post('directa/share')
   async shareDirecta(@CurrentUser() user: JwtPayloadUser, @Body() dto: ShareDirectaDto) {
     const created = await this.tablerosService.shareDirecta(user.userId, dto);
-    const nota = await this.notasService.create(user.userId, created.tablero.id, {
-      type: 'text',
-      text: created.text,
-    });
+    const nota =
+      created.type === 'draw'
+        ? await this.notasService.create(user.userId, created.tablero.id, {
+            type: 'draw',
+            imageDataUrl: created.imageDataUrl ?? undefined,
+          })
+        : await this.notasService.create(user.userId, created.tablero.id, {
+            type: 'text',
+            text: created.text ?? undefined,
+          });
     // Emit to all members including creator (other devices / same account).
     this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id);
     return { tablero: created.tablero, nota };
@@ -57,10 +63,16 @@ export class TablerosController {
   @Post('grupo')
   async createGrupo(@CurrentUser() user: JwtPayloadUser, @Body() dto: CreateGrupoDto) {
     const created = await this.tablerosService.createGrupo(user.userId, dto);
-    const nota = await this.notasService.create(user.userId, created.tablero.id, {
-      type: 'text',
-      text: created.text,
-    });
+    const nota =
+      created.type === 'draw'
+        ? await this.notasService.create(user.userId, created.tablero.id, {
+            type: 'draw',
+            imageDataUrl: created.imageDataUrl ?? undefined,
+          })
+        : await this.notasService.create(user.userId, created.tablero.id, {
+            type: 'text',
+            text: created.text ?? undefined,
+          });
     // Emit to all members including creator (other devices / same account).
     this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id);
     return { tablero: created.tablero, nota };

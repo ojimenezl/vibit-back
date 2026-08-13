@@ -1,18 +1,41 @@
-import { ArrayMinSize, IsArray, IsMongoId, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsMongoId,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateGrupoDto {
   @IsString()
   @MinLength(1)
   @MaxLength(80)
-  nombre: string;
+  nombre!: string;
 
   @IsArray()
   @ArrayMinSize(1)
   @IsMongoId({ each: true })
-  contactIds: string[];
+  contactIds!: string[];
 
+  @IsOptional()
+  @IsIn(['text', 'draw'])
+  type?: 'text' | 'draw';
+
+  @ValidateIf((o: CreateGrupoDto) => (o.type ?? 'text') === 'text')
   @IsString()
   @MinLength(1)
   @MaxLength(2000)
-  text: string;
+  text?: string;
+
+  @ValidateIf((o: CreateGrupoDto) => o.type === 'draw')
+  @IsString()
+  @MinLength(32)
+  @MaxLength(2_500_000)
+  @Matches(/^data:image\/(png|jpeg|jpg|webp);base64,/)
+  imageDataUrl?: string;
 }
