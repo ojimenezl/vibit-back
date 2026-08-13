@@ -48,7 +48,8 @@ export class TablerosController {
       type: 'text',
       text: created.text,
     });
-    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id, user.userId);
+    // Emit to all members including creator (other devices / same account).
+    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id);
     return { tablero: created.tablero, nota };
   }
 
@@ -59,7 +60,8 @@ export class TablerosController {
       type: 'text',
       text: created.text,
     });
-    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id, user.userId);
+    // Emit to all members including creator (other devices / same account).
+    this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id);
     return { tablero: created.tablero, nota };
   }
 
