@@ -112,11 +112,12 @@ export class NotasService {
         publicNota,
         userId,
       );
-      void this.pushService.notifyWidgetSync(
-        tablero.miembros.map((id) => id.toString()),
-        userId,
-      );
     }
+
+    // Widget: avisa a todos los miembros (incluido el autor) en personal, directa y grupo.
+    void this.pushService.notifyWidgetSync(
+      tablero.miembros.map((id) => id.toString()),
+    );
 
     return publicNota;
   }
@@ -128,7 +129,7 @@ export class NotasService {
   }
 
   async update(userId: string, boardId: string, notaId: string, dto: UpdateNotaDto) {
-    await this.tablerosService.getByIdForMember(boardId, userId);
+    const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
     const nota = await this.notasRepository.findById(notaId);
     if (!nota || nota.boardId.toString() !== boardId || nota.deletedAt) {
       throw new NotFoundException('Nota no encontrada');
@@ -137,29 +138,40 @@ export class NotasService {
       throw new ForbiddenException('Solo puedes editar tus propias notas');
     }
 
+    let publicNota;
+
     if (nota.type === 'text') {
       const text = dto.text?.trim();
       if (!text) throw new BadRequestException('El texto es obligatorio');
       const updated = await this.notasRepository.updateText(notaId, text);
       if (!updated) throw new NotFoundException('Nota no encontrada');
-      return this.notasRepository.toPublic(updated, userId);
-    }
-
-    if (nota.type === 'draw') {
+      publicNota = this.notasRepository.toPublic(updated, userId);
+    } else if (nota.type === 'draw') {
       const imageDataUrl = dto.imageDataUrl?.trim();
       if (!imageDataUrl) throw new BadRequestException('El dibujo es obligatorio');
       const updated = await this.notasRepository.updateMedia(notaId, [
         mediaFromDataUrl(imageDataUrl),
       ]);
       if (!updated) throw new NotFoundException('Nota no encontrada');
-      return this.notasRepository.toPublic(updated, userId);
+      publicNota = this.notasRepository.toPublic(updated, userId);
+    } else {
+      throw new BadRequestException('Este tipo de nota no se puede editar aún');
     }
 
-    throw new BadRequestException('Este tipo de nota no se puede editar aún');
+    if (tablero.categoria === 'directa') {
+      await this.tablerosService.bumpExpiresAt(boardId);
+    }
+
+    // Incluye al editor: el widget debe refrescarse al editar, no solo al crear.
+    void this.pushService.notifyWidgetSync(
+      tablero.miembros.map((id) => id.toString()),
+    );
+
+    return publicNota;
   }
 
   async softDelete(userId: string, boardId: string, notaId: string) {
-    await this.tablerosService.getByIdForMember(boardId, userId);
+    const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
     const nota = await this.notasRepository.findById(notaId);
     if (!nota || nota.boardId.toString() !== boardId || nota.deletedAt) {
       throw new NotFoundException('Nota no encontrada');
@@ -170,6 +182,11 @@ export class NotasService {
 
     const updated = await this.notasRepository.softDelete(notaId);
     if (!updated) throw new NotFoundException('Nota no encontrada');
+
+    void this.pushService.notifyWidgetSync(
+      tablero.miembros.map((id) => id.toString()),
+    );
+
     return { ok: true };
   }
 
@@ -240,6 +257,10 @@ export class NotasService {
       userId,
       next,
       publicNota.reactionCounts,
+    );
+
+    void this.pushService.notifyWidgetSync(
+      tablero.miembros.map((id) => id.toString()),
     );
 
     return publicNota;
