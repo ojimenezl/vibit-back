@@ -113,6 +113,11 @@ export class NotasRepository {
       }
     }
 
+    const isAuthor = viewerId != null && viewerId === nota.authorId.toString();
+    const visibleCounts = isAuthor
+      ? reactionCounts
+      : { like: 0, heart: 0, laugh: 0, wow: 0 };
+
     return {
       id: nota._id.toString(),
       authorId: nota.authorId.toString(),
@@ -122,7 +127,7 @@ export class NotasRepository {
       text: nota.text,
       media: nota.media,
       reactions,
-      reactionCounts,
+      reactionCounts: visibleCounts,
       myReaction: viewerId ? reactions[viewerId] ?? null : null,
       expiresAt: nota.expiresAt,
       createdAt: (nota as NotaDocument & { createdAt?: Date }).createdAt,

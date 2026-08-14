@@ -42,6 +42,7 @@ export class WidgetService {
       text: string;
       imageDataUrl: string | null;
       authorUsername: string;
+      authorId: string;
       isPersonal: boolean;
       isUnseen: boolean;
       reactionCounts: { like: number; heart: number; laugh: number; wow: number };
@@ -111,6 +112,7 @@ export class WidgetService {
           text,
           imageDataUrl,
           authorUsername: usernameMap.get(nota.authorId.toString()) ?? 'Usuario',
+          authorId: nota.authorId.toString(),
           isPersonal,
           isUnseen,
           reactionCounts: publicNota.reactionCounts,
