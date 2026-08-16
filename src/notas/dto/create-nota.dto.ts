@@ -21,7 +21,7 @@ export class CreateNotaDto {
   text?: string;
 
   /** Data URL JPEG/PNG del dibujo (MVP sin storage externo). */
-  @ValidateIf((o: CreateNotaDto) => o.type === 'draw')
+  @ValidateIf((o: CreateNotaDto) => o.type === 'draw' || o.type === 'photo')
   @IsString()
   @MinLength(32)
   @MaxLength(2_500_000)

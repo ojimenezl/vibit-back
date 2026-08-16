@@ -46,9 +46,9 @@ export class TablerosController {
   async shareDirecta(@CurrentUser() user: JwtPayloadUser, @Body() dto: ShareDirectaDto) {
     const created = await this.tablerosService.shareDirecta(user.userId, dto);
     const nota =
-      created.type === 'draw'
+      created.type === 'draw' || created.type === 'photo'
         ? await this.notasService.create(user.userId, created.tablero.id, {
-            type: 'draw',
+            type: created.type,
             imageDataUrl: created.imageDataUrl ?? undefined,
             recipientIds: dto.contactIds,
           })
@@ -66,9 +66,9 @@ export class TablerosController {
   async createGrupo(@CurrentUser() user: JwtPayloadUser, @Body() dto: CreateGrupoDto) {
     const created = await this.tablerosService.createGrupo(user.userId, dto);
     const nota =
-      created.type === 'draw'
+      created.type === 'draw' || created.type === 'photo'
         ? await this.notasService.create(user.userId, created.tablero.id, {
-            type: 'draw',
+            type: created.type,
             imageDataUrl: created.imageDataUrl ?? undefined,
           })
         : await this.notasService.create(user.userId, created.tablero.id, {

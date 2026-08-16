@@ -42,10 +42,6 @@ export class NotasService {
   async create(userId: string, boardId: string, dto: CreateNotaDto) {
     const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
 
-    if (dto.type === 'photo') {
-      throw new BadRequestException('Las notas de foto llegarán pronto');
-    }
-
     const tipoNota =
       tablero.categoria === 'personal' || tablero.categoria === 'grupo'
         ? 'estatico'
@@ -55,13 +51,15 @@ export class NotasService {
 
     let text: string | null = null;
     let media: ReturnType<typeof mediaFromDataUrl>[] = [];
-    let type: 'text' | 'draw' = 'text';
+    let type: 'text' | 'draw' | 'photo' = 'text';
 
-    if (dto.type === 'draw') {
+    if (dto.type === 'draw' || dto.type === 'photo') {
       if (!dto.imageDataUrl?.trim()) {
-        throw new BadRequestException('El dibujo es obligatorio');
+        throw new BadRequestException(
+          dto.type === 'photo' ? 'La foto es obligatoria' : 'El dibujo es obligatorio',
+        );
       }
-      type = 'draw';
+      type = dto.type;
       media = [mediaFromDataUrl(dto.imageDataUrl.trim())];
     } else {
       const trimmed = dto.text?.trim();
@@ -167,9 +165,13 @@ export class NotasService {
       const updated = await this.notasRepository.updateText(notaId, text);
       if (!updated) throw new NotFoundException('Nota no encontrada');
       publicNota = this.notasRepository.toPublic(updated, userId, tablero.categoria);
-    } else if (nota.type === 'draw') {
+    } else if (nota.type === 'draw' || nota.type === 'photo') {
       const imageDataUrl = dto.imageDataUrl?.trim();
-      if (!imageDataUrl) throw new BadRequestException('El dibujo es obligatorio');
+      if (!imageDataUrl) {
+        throw new BadRequestException(
+          nota.type === 'photo' ? 'La foto es obligatoria' : 'El dibujo es obligatorio',
+        );
+      }
       const updated = await this.notasRepository.updateMedia(notaId, [
         mediaFromDataUrl(imageDataUrl),
       ]);

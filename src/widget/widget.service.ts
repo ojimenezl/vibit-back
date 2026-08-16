@@ -38,7 +38,7 @@ export class WidgetService {
       boardId: string;
       boardName: string;
       boardCategoria: string;
-      type: 'text' | 'draw';
+      type: 'text' | 'draw' | 'photo';
       text: string;
       imageDataUrl: string | null;
       authorUsername: string;
@@ -74,7 +74,6 @@ export class WidgetService {
       const lastSeen = seenMap.get(board._id.toString());
 
       for (const nota of notas) {
-        if (nota.type === 'photo') continue;
         if (
           !NotasRepository.isVisibleToUser(nota, userId, board.categoria)
         ) {
@@ -88,16 +87,16 @@ export class WidgetService {
         );
         let text = '';
         let imageDataUrl: string | null = null;
-        let type: 'text' | 'draw' = 'text';
+        let type: 'text' | 'draw' | 'photo' = 'text';
 
-        if (nota.type === 'draw') {
+        if (nota.type === 'draw' || nota.type === 'photo') {
           const mediaUrl =
             Array.isArray(publicNota.media) && publicNota.media[0]?.url
               ? String(publicNota.media[0].url)
               : '';
           if (!mediaUrl) continue;
-          type = 'draw';
-          text = '✎ Dibujo';
+          type = nota.type;
+          text = nota.type === 'photo' ? '◉ Foto' : '✎ Dibujo';
           imageDataUrl = mediaUrl;
         } else if (nota.type === 'text' && nota.text) {
           type = 'text';

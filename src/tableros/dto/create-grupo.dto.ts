@@ -23,8 +23,8 @@ export class CreateGrupoDto {
   contactIds!: string[];
 
   @IsOptional()
-  @IsIn(['text', 'draw'])
-  type?: 'text' | 'draw';
+  @IsIn(['text', 'draw', 'photo'])
+  type?: 'text' | 'draw' | 'photo';
 
   @ValidateIf((o: CreateGrupoDto) => (o.type ?? 'text') === 'text')
   @IsString()
@@ -32,7 +32,7 @@ export class CreateGrupoDto {
   @MaxLength(2000)
   text?: string;
 
-  @ValidateIf((o: CreateGrupoDto) => o.type === 'draw')
+  @ValidateIf((o: CreateGrupoDto) => o.type === 'draw' || o.type === 'photo')
   @IsString()
   @MinLength(32)
   @MaxLength(2_500_000)

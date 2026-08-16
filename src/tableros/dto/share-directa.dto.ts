@@ -18,8 +18,8 @@ export class ShareDirectaDto {
   contactIds!: string[];
 
   @IsOptional()
-  @IsIn(['text', 'draw'])
-  type?: 'text' | 'draw';
+  @IsIn(['text', 'draw', 'photo'])
+  type?: 'text' | 'draw' | 'photo';
 
   @ValidateIf((o: ShareDirectaDto) => (o.type ?? 'text') === 'text')
   @IsString()
@@ -27,7 +27,7 @@ export class ShareDirectaDto {
   @MaxLength(2000)
   text?: string;
 
-  @ValidateIf((o: ShareDirectaDto) => o.type === 'draw')
+  @ValidateIf((o: ShareDirectaDto) => o.type === 'draw' || o.type === 'photo')
   @IsString()
   @MinLength(32)
   @MaxLength(2_500_000)

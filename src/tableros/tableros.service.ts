@@ -224,15 +224,19 @@ export class TablerosService {
   }
 
   async shareDirecta(userId: string, dto: ShareDirectaDto) {
-    const type = dto.type === 'draw' ? 'draw' : 'text';
+    const type =
+      dto.type === 'draw' || dto.type === 'photo' ? dto.type : 'text';
     const text = type === 'text' ? dto.text?.trim() ?? '' : '';
-    const imageDataUrl = type === 'draw' ? dto.imageDataUrl?.trim() ?? '' : '';
+    const imageDataUrl =
+      type === 'draw' || type === 'photo' ? dto.imageDataUrl?.trim() ?? '' : '';
 
     if (type === 'text' && !text) {
       throw new BadRequestException('El texto es obligatorio');
     }
-    if (type === 'draw' && !imageDataUrl) {
-      throw new BadRequestException('El dibujo es obligatorio');
+    if ((type === 'draw' || type === 'photo') && !imageDataUrl) {
+      throw new BadRequestException(
+        type === 'photo' ? 'La foto es obligatoria' : 'El dibujo es obligatorio',
+      );
     }
 
     const { me, contacts, uniqueIds } = await this.resolveContactMembers(
@@ -283,7 +287,7 @@ export class TablerosService {
       },
       type,
       text: type === 'text' ? text : null,
-      imageDataUrl: type === 'draw' ? imageDataUrl : null,
+      imageDataUrl: type === 'draw' || type === 'photo' ? imageDataUrl : null,
     };
   }
 
@@ -291,15 +295,19 @@ export class TablerosService {
     const nombre = dto.nombre.trim();
     if (!nombre) throw new BadRequestException('El nombre del grupo es obligatorio');
 
-    const type = dto.type === 'draw' ? 'draw' : 'text';
+    const type =
+      dto.type === 'draw' || dto.type === 'photo' ? dto.type : 'text';
     const text = type === 'text' ? dto.text?.trim() ?? '' : '';
-    const imageDataUrl = type === 'draw' ? dto.imageDataUrl?.trim() ?? '' : '';
+    const imageDataUrl =
+      type === 'draw' || type === 'photo' ? dto.imageDataUrl?.trim() ?? '' : '';
 
     if (type === 'text' && !text) {
       throw new BadRequestException('El texto es obligatorio');
     }
-    if (type === 'draw' && !imageDataUrl) {
-      throw new BadRequestException('El dibujo es obligatorio');
+    if ((type === 'draw' || type === 'photo') && !imageDataUrl) {
+      throw new BadRequestException(
+        type === 'photo' ? 'La foto es obligatoria' : 'El dibujo es obligatorio',
+      );
     }
 
     const { me, contacts, uniqueIds } = await this.resolveContactMembers(
@@ -349,7 +357,7 @@ export class TablerosService {
       },
       type,
       text: type === 'text' ? text : null,
-      imageDataUrl: type === 'draw' ? imageDataUrl : null,
+      imageDataUrl: type === 'draw' || type === 'photo' ? imageDataUrl : null,
     };
   }
 
