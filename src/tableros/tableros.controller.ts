@@ -50,10 +50,12 @@ export class TablerosController {
         ? await this.notasService.create(user.userId, created.tablero.id, {
             type: 'draw',
             imageDataUrl: created.imageDataUrl ?? undefined,
+            recipientIds: dto.contactIds,
           })
         : await this.notasService.create(user.userId, created.tablero.id, {
             type: 'text',
             text: created.text ?? undefined,
+            recipientIds: dto.contactIds,
           });
     // Emit to all members including creator (other devices / same account).
     this.realtimeService.emitBoardCreated(created.tablero.miembros, created.tablero.id);

@@ -75,8 +75,17 @@ export class WidgetService {
 
       for (const nota of notas) {
         if (nota.type === 'photo') continue;
+        if (
+          !NotasRepository.isVisibleToUser(nota, userId, board.categoria)
+        ) {
+          continue;
+        }
 
-        const publicNota = this.notasRepository.toPublic(nota, userId);
+        const publicNota = this.notasRepository.toPublic(
+          nota,
+          userId,
+          board.categoria,
+        );
         let text = '';
         let imageDataUrl: string | null = null;
         let type: 'text' | 'draw' = 'text';

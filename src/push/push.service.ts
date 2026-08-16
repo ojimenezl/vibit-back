@@ -55,34 +55,30 @@ export class PushService implements OnModuleInit {
     }
   }
 
-  /** Silent data-only push so Android refreshes the home widget without a tray notification. */
-  async notifyWidgetSync(userIds: string[], excludeUserId?: string) {
-    if (!this.ready) return;
-
+  private async collectTokens(userIds: string[], excludeUserId?: string) {
     const unique = [...new Set(userIds)].filter((id) => id && id !== excludeUserId);
-    if (!unique.length) return;
+    if (!unique.length) return [] as string[];
 
     const users = await this.usersService.findByIds(unique);
-    const tokens = [
+    return [
       ...new Set(users.flatMap((u) => u.fcmTokens ?? []).filter(Boolean)),
     ];
+  }
+
+  private async sendMulticast(
+    tokens: string[],
+    message: Omit<admin.messaging.MulticastMessage, 'tokens'>,
+  ) {
     if (!tokens.length) return;
 
     const invalid: string[] = [];
 
-    // FCM allows up to 500 tokens per multicast
     for (let i = 0; i < tokens.length; i += 500) {
       const chunk = tokens.slice(i, i + 500);
       try {
         const res = await admin.messaging().sendEachForMulticast({
           tokens: chunk,
-          // No "notification" key → silent / data-only
-          data: {
-            type: 'widget_sync',
-          },
-          android: {
-            priority: 'high',
-          },
+          ...message,
         });
 
         res.responses.forEach((r, idx) => {
@@ -106,5 +102,60 @@ export class PushService implements OnModuleInit {
     }
 
     await Promise.all(invalid.map((t) => this.usersService.removeFcmToken(t)));
+  }
+
+  /** Silent data-only push so Android refreshes the home widget without a tray notification. */
+  async notifyWidgetSync(userIds: string[], excludeUserId?: string) {
+    if (!this.ready) return;
+
+    const tokens = await this.collectTokens(userIds, excludeUserId);
+    await this.sendMulticast(tokens, {
+      data: {
+        type: 'widget_sync',
+      },
+      android: {
+        priority: 'high',
+      },
+    });
+  }
+
+  /**
+   * Tray notification (amigos). Solo para eventos explícitos de contacto;
+   * el resto del producto sigue sin notificaciones al móvil.
+   */
+  async notifyTray(
+    userIds: string[],
+    opts: {
+      body: string;
+      title?: string;
+      type: string;
+      excludeUserId?: string;
+    },
+  ) {
+    if (!this.ready) return;
+
+    const tokens = await this.collectTokens(userIds, opts.excludeUserId);
+    const title = opts.title?.trim() || 'Vibit';
+    const body = opts.body.trim();
+    if (!body || !tokens.length) return;
+
+    await this.sendMulticast(tokens, {
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        type: opts.type,
+        body,
+        title,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'vibit_friends',
+          sound: 'default',
+        },
+      },
+    });
   }
 }

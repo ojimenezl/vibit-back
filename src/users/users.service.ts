@@ -107,7 +107,15 @@ export class UsersService {
   async registerFcmToken(userId: string, token: string) {
     const trimmed = token.trim();
     if (!trimmed) throw new BadRequestException('Token FCM inválido');
+    await this.usersRepository.removeFcmToken(trimmed);
     await this.usersRepository.addFcmToken(userId, trimmed);
+    return { ok: true };
+  }
+
+  async unregisterFcmToken(token: string) {
+    const trimmed = token.trim();
+    if (!trimmed) throw new BadRequestException('Token FCM inválido');
+    await this.usersRepository.removeFcmToken(trimmed);
     return { ok: true };
   }
 

@@ -8,6 +8,7 @@ import {
 import { Types } from 'mongoose';
 import { ContactsRepository } from './contacts.repository';
 import { RealtimeService } from '../realtime/realtime.service';
+import { PushService } from '../push/push.service';
 
 const NOTIF_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -16,6 +17,7 @@ export class ContactsService {
   constructor(
     private readonly contactsRepository: ContactsRepository,
     private readonly realtimeService: RealtimeService,
+    private readonly pushService: PushService,
   ) {}
 
   private expiresIn24h() {
@@ -161,6 +163,11 @@ export class ContactsService {
     );
     this.realtimeService.emitNotificationNew(requesterId);
 
+    void this.pushService.notifyTray([target._id.toString()], {
+      type: 'friend_request',
+      body: `${requester.username} quiere ser tu amigo vibit`,
+    });
+
     return {
       ok: true,
       message: 'Solicitud enviada',
@@ -213,6 +220,12 @@ export class ContactsService {
       expires,
     );
     this.realtimeService.emitNotificationNew(userId);
+
+    const accepterName = user.username || 'Usuario';
+    void this.pushService.notifyTray([requesterId], {
+      type: 'friend_accepted',
+      body: `${accepterName} ha aceptado ser tu amigo vibit`,
+    });
 
     const requester = await this.contactsRepository.findById(requesterId);
     return {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -26,5 +26,11 @@ export class UsersController {
   @UseGuards(AuthGuard('jwt'))
   registerFcm(@CurrentUser() user: JwtPayloadUser, @Body() dto: RegisterFcmTokenDto) {
     return this.usersService.registerFcmToken(user.userId, dto.token);
+  }
+
+  @Delete('me/fcm-token')
+  @UseGuards(AuthGuard('jwt'))
+  unregisterFcm(@Body() dto: RegisterFcmTokenDto) {
+    return this.usersService.unregisterFcmToken(dto.token);
   }
 }

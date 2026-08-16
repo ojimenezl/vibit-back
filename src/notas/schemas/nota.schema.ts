@@ -41,6 +41,14 @@ export class Nota {
   @Prop({ type: Map, of: String, default: {} })
   reactions: Map<string, string>;
 
+  /**
+   * Destinatarios (solo efímero/directa).
+   * Vacío = legacy / visible a todos los miembros del tablero.
+   * Autor siempre ve su nota aunque no esté en la lista.
+   */
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  recipientIds: Types.ObjectId[];
+
   @Prop({ type: Date, default: null })
   expiresAt: Date | null;
 

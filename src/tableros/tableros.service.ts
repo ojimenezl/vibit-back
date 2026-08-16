@@ -48,7 +48,27 @@ export class TablerosService {
       await this.usersService.addTablero(userId, tablero._id);
     }
 
-    return this.tablerosRepository.toPublic(tablero);
+    const publicBoard = this.tablerosRepository.toPublic(tablero);
+    const [latest] = await this.notasRepository.findLatestByBoardIds([
+      publicBoard.id,
+    ]);
+    const boardActivity = [
+      publicBoard.updatedAt,
+      publicBoard.createdAt,
+      latest?.activityAt,
+      latest?.updatedAt,
+      latest?.createdAt,
+    ]
+      .map((d) => (d ? new Date(d).getTime() : 0))
+      .reduce((max, t) => Math.max(max, t), 0);
+
+    return {
+      ...publicBoard,
+      previewKind: latest?.type ?? null,
+      previewText:
+        latest?.type === 'text' ? (latest.text?.trim() || null) : null,
+      activityAt: boardActivity ? new Date(boardActivity).toISOString() : null,
+    };
   }
 
   async getByIdForMember(boardId: string, userId: string) {
@@ -130,17 +150,51 @@ export class TablerosService {
     const users = await this.usersService.findByIds(allMemberIds);
     const nameMap = new Map(users.map((u) => [u._id.toString(), u.username]));
 
-    return boards.map((b) => {
+    const boardIds = boards.map((b) => b._id.toString());
+    const privadaBoardIds = boards
+      .filter((b) => b.categoria === 'directa')
+      .map((b) => b._id.toString());
+    const latestNotes = await this.notasRepository.findLatestByBoardIds(
+      boardIds,
+      { userId, privadaBoardIds },
+    );
+    const latestByBoard = new Map(latestNotes.map((n) => [n.boardId, n]));
+
+    const items = boards.map((b) => {
       const miembrosInfo = b.miembros.map((id) => ({
         id: id.toString(),
         username: nameMap.get(id.toString()) ?? 'Usuario',
       }));
+      const publicBoard = this.tablerosRepository.toPublic(b);
+      const latest = latestByBoard.get(publicBoard.id);
+      const boardActivity = [
+        publicBoard.updatedAt,
+        publicBoard.createdAt,
+        latest?.activityAt,
+        latest?.updatedAt,
+        latest?.createdAt,
+      ]
+        .map((d) => (d ? new Date(d).getTime() : 0))
+        .reduce((max, t) => Math.max(max, t), 0);
+
       return {
-        ...this.tablerosRepository.toPublic(b),
+        ...publicBoard,
         displayName: this.displayNameForUser(b, userId, miembrosInfo),
         miembrosInfo,
+        previewKind: latest?.type ?? null,
+        previewText:
+          latest?.type === 'text' ? (latest.text?.trim() || null) : null,
+        activityAt: boardActivity ? new Date(boardActivity).toISOString() : null,
       };
     });
+
+    items.sort((a, b) => {
+      const ta = a.activityAt ? new Date(a.activityAt).getTime() : 0;
+      const tb = b.activityAt ? new Date(b.activityAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    return items;
   }
 
   private async resolveContactMembers(userId: string, contactIds: string[]) {

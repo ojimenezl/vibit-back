@@ -1,4 +1,6 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsIn,
   IsOptional,
   IsString,
@@ -25,4 +27,11 @@ export class CreateNotaDto {
   @MaxLength(2_500_000)
   @Matches(/^data:image\/(png|jpeg|jpg|webp);base64,/)
   imageDataUrl?: string;
+
+  /** Solo tableros efímeros: a quién se envía la nota (ids de miembros). */
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  recipientIds?: string[];
 }

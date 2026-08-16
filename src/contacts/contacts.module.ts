@@ -5,11 +5,13 @@ import { ContactsRepository } from './contacts.repository';
 import { ContactsService } from './contacts.service';
 import { ContactsController } from './contacts.controller';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     RealtimeModule,
+    PushModule,
   ],
   controllers: [ContactsController],
   providers: [ContactsRepository, ContactsService],

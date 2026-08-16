@@ -42,18 +42,6 @@ export class NotasService {
   async create(userId: string, boardId: string, dto: CreateNotaDto) {
     const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
 
-    // Tablero efímero (directa): solo el creador puede publicar notas adicionales.
-    // Los demás miembros solo ven y reaccionan — no es un chat de notas.
-    // FUTURO: quitar este bloque si queremos que cualquier miembro publique en efímeros.
-    if (
-      tablero.categoria === 'directa' &&
-      tablero.adminUserId.toString() !== userId
-    ) {
-      throw new ForbiddenException(
-        'En una nota directa solo quien la envió puede publicar más notas',
-      );
-    }
-
     if (dto.type === 'photo') {
       throw new BadRequestException('Las notas de foto llegarán pronto');
     }
@@ -84,6 +72,32 @@ export class NotasService {
       text = trimmed;
     }
 
+    const memberIds = tablero.miembros.map((id) => id.toString());
+    let recipientIds: Types.ObjectId[] = [];
+    if (tablero.categoria === 'directa') {
+      const adminId = tablero.adminUserId.toString();
+      const isAdmin = adminId === userId;
+
+      if (isAdmin) {
+        const memberSet = new Set(memberIds);
+        const unique = [...new Set((dto.recipientIds ?? []).map((id) => id.trim()))].filter(
+          (id) => id && id !== userId && memberSet.has(id),
+        );
+        if (!unique.length) {
+          throw new BadRequestException(
+            'Elige al menos un destinatario de este tablero',
+          );
+        }
+        recipientIds = unique.map((id) => new Types.ObjectId(id));
+      } else {
+        // Miembros no admin: siempre solo al creador/admin del efímero.
+        if (!memberIds.includes(adminId) || adminId === userId) {
+          throw new BadRequestException('No hay admin al que enviar la nota');
+        }
+        recipientIds = [new Types.ObjectId(adminId)];
+      }
+    }
+
     const nota = await this.notasRepository.create({
       authorId: new Types.ObjectId(userId),
       boardId: new Types.ObjectId(boardId),
@@ -92,6 +106,7 @@ export class NotasService {
       text,
       media,
       reactions: new Map(),
+      recipientIds,
       expiresAt,
       deletedAt: null,
     });
@@ -103,29 +118,35 @@ export class NotasService {
       await this.usersService.markWidgetBoardSeen(userId, boardId);
     }
 
-    const publicNota = this.notasRepository.toPublic(nota, userId);
+    const publicNota = this.notasRepository.toPublic(nota, userId, tablero.categoria);
+    const audience = NotasRepository.audienceUserIds(
+      nota,
+      memberIds,
+      tablero.categoria,
+    );
 
     if (tablero.categoria !== 'personal') {
       this.realtimeService.emitNoteCreated(
-        tablero.miembros.map((id) => id.toString()),
+        audience,
         boardId,
         publicNota,
         userId,
       );
     }
 
-    // Widget: avisa a todos los miembros (incluido el autor) en personal, directa y grupo.
-    void this.pushService.notifyWidgetSync(
-      tablero.miembros.map((id) => id.toString()),
-    );
+    void this.pushService.notifyWidgetSync(audience);
 
     return publicNota;
   }
 
   async listByBoard(userId: string, boardId: string) {
-    await this.tablerosService.getByIdForMember(boardId, userId);
+    const tablero = await this.tablerosService.getByIdForMember(boardId, userId);
     const notas = await this.notasRepository.findActiveByBoard(boardId);
-    return notas.map((n) => this.notasRepository.toPublic(n, userId));
+    return notas
+      .filter((n) =>
+        NotasRepository.isVisibleToUser(n, userId, tablero.categoria),
+      )
+      .map((n) => this.notasRepository.toPublic(n, userId, tablero.categoria));
   }
 
   async update(userId: string, boardId: string, notaId: string, dto: UpdateNotaDto) {
@@ -145,7 +166,7 @@ export class NotasService {
       if (!text) throw new BadRequestException('El texto es obligatorio');
       const updated = await this.notasRepository.updateText(notaId, text);
       if (!updated) throw new NotFoundException('Nota no encontrada');
-      publicNota = this.notasRepository.toPublic(updated, userId);
+      publicNota = this.notasRepository.toPublic(updated, userId, tablero.categoria);
     } else if (nota.type === 'draw') {
       const imageDataUrl = dto.imageDataUrl?.trim();
       if (!imageDataUrl) throw new BadRequestException('El dibujo es obligatorio');
@@ -153,7 +174,7 @@ export class NotasService {
         mediaFromDataUrl(imageDataUrl),
       ]);
       if (!updated) throw new NotFoundException('Nota no encontrada');
-      publicNota = this.notasRepository.toPublic(updated, userId);
+      publicNota = this.notasRepository.toPublic(updated, userId, tablero.categoria);
     } else {
       throw new BadRequestException('Este tipo de nota no se puede editar aún');
     }
@@ -162,10 +183,12 @@ export class NotasService {
       await this.tablerosService.bumpExpiresAt(boardId);
     }
 
-    // Incluye al editor: el widget debe refrescarse al editar, no solo al crear.
-    void this.pushService.notifyWidgetSync(
+    const audience = NotasRepository.audienceUserIds(
+      nota,
       tablero.miembros.map((id) => id.toString()),
+      tablero.categoria,
     );
+    void this.pushService.notifyWidgetSync(audience);
 
     return publicNota;
   }
@@ -183,9 +206,12 @@ export class NotasService {
     const updated = await this.notasRepository.softDelete(notaId);
     if (!updated) throw new NotFoundException('Nota no encontrada');
 
-    void this.pushService.notifyWidgetSync(
+    const audience = NotasRepository.audienceUserIds(
+      nota,
       tablero.miembros.map((id) => id.toString()),
+      tablero.categoria,
     );
+    void this.pushService.notifyWidgetSync(audience);
 
     return { ok: true };
   }
@@ -203,6 +229,9 @@ export class NotasService {
     const nota = await this.notasRepository.findById(notaId);
     if (!nota || nota.boardId.toString() !== boardId || nota.deletedAt) {
       throw new NotFoundException('Nota no encontrada');
+    }
+    if (!NotasRepository.isVisibleToUser(nota, userId, tablero.categoria)) {
+      throw new ForbiddenException('No puedes reaccionar a esta nota');
     }
 
     const current =
@@ -249,19 +278,41 @@ export class NotasService {
       }
     }
 
-    const publicNota = this.notasRepository.toPublic(updated, userId);
-    this.realtimeService.emitReactionUpdated(
-      tablero.miembros.map((id) => id.toString()),
-      boardId,
-      notaId,
+    const publicNota = this.notasRepository.toPublic(
+      updated,
       userId,
-      next,
-      publicNota.reactionCounts,
+      tablero.categoria,
+    );
+    const audience = NotasRepository.audienceUserIds(
+      nota,
+      tablero.miembros.map((id) => id.toString()),
+      tablero.categoria,
     );
 
-    void this.pushService.notifyWidgetSync(
-      tablero.miembros.map((id) => id.toString()),
+    // Conteos personalizados por destinatario (efímero ≠ grupo).
+    const fullPublic = this.notasRepository.toPublic(
+      updated,
+      nota.authorId.toString(),
+      tablero.categoria,
     );
+    for (const uid of audience) {
+      if (uid === userId) continue;
+      const counts =
+        uid === nota.authorId.toString()
+          ? fullPublic.reactionCounts
+          : this.notasRepository.toPublic(updated, uid, tablero.categoria)
+              .reactionCounts;
+      this.realtimeService.emitReactionUpdated(
+        [uid],
+        boardId,
+        notaId,
+        userId,
+        next,
+        counts,
+      );
+    }
+
+    void this.pushService.notifyWidgetSync(audience);
 
     return publicNota;
   }
