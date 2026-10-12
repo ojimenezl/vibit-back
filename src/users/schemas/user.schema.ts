@@ -80,8 +80,11 @@ export class User {
   @Prop({ type: [String], default: [] })
   fcmTokens: string[];
 
-  @Prop({ type: String, default: null })
+  @Prop({ type: String, default: null, unique: true, sparse: true, index: true })
   googleId: string | null;
+
+  @Prop({ type: String, default: null })
+  googleEmail: string | null;
 
   @Prop({
     type: [

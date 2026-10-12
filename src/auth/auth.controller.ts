@@ -5,6 +5,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyPinDto } from './dto/verify-pin.dto';
 import { ChangePinDto } from './dto/change-pin.dto';
+import { GoogleTokenDto } from './dto/google-token.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtPayloadUser } from '../common/decorators/current-user.decorator';
 
@@ -21,6 +22,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('google/login')
+  @HttpCode(HttpStatus.OK)
+  loginWithGoogle(@Body() dto: GoogleTokenDto) {
+    return this.authService.loginWithGoogle(dto.idToken);
+  }
+
+  @Post('google/link')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
+  linkGoogle(@CurrentUser() user: JwtPayloadUser, @Body() dto: GoogleTokenDto) {
+    return this.authService.linkGoogle(user.userId, dto.idToken);
   }
 
   @Post('verify-pin')

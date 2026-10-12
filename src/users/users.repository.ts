@@ -19,6 +19,24 @@ export class UsersRepository {
     return this.userModel.findOne({ userCode: userCode.toUpperCase() }).exec();
   }
 
+  findByGoogleId(googleId: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ googleId }).exec();
+  }
+
+  linkGoogle(
+    userId: string,
+    googleId: string,
+    googleEmail: string | null,
+  ): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        userId,
+        { $set: { googleId, googleEmail } },
+        { returnDocument: 'after' },
+      )
+      .exec();
+  }
+
   findByLinkUser(linkUser: string): Promise<UserDocument | null> {
     return this.userModel.findOne({ linkUser }).exec();
   }
@@ -170,6 +188,8 @@ export class UsersRepository {
       userCode: user.userCode,
       linkUser: user.linkUser,
       idTableros: user.idTableros.map((id) => id.toString()),
+      hasGoogle: Boolean(user.googleId),
+      googleEmail: user.googleEmail ?? null,
       createdAt: (user as UserDocument & { createdAt?: Date }).createdAt,
     };
   }

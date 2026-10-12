@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -12,6 +13,7 @@ import { TablerosService } from '../tableros/tableros.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePinDto } from './dto/change-pin.dto';
+import { GoogleTokenService } from './google-token.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +21,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly tablerosService: TablerosService,
     private readonly jwtService: JwtService,
+    private readonly googleTokenService: GoogleTokenService,
   ) {}
 
   private generateUserCode(): string {
@@ -66,6 +69,7 @@ export class AuthService {
       idTableros: [],
       fcmTokens: [],
       googleId: null,
+      googleEmail: null,
     });
 
     const tablero = await this.tablerosService.createPersonal(user._id.toString(), username);
@@ -129,5 +133,50 @@ export class AuthService {
     const pinHash = await bcrypt.hash(dto.newPin, 12);
     await this.usersService.updatePinHash(userId, pinHash);
     return { ok: true };
+  }
+
+  /** Vincula Google a la cuenta ya logueada (tras onboarding normal). */
+  async linkGoogle(userId: string, idToken: string) {
+    const identity = await this.googleTokenService.verifyIdToken(idToken);
+    const current = await this.usersService.findById(userId);
+    if (!current) throw new NotFoundException('Usuario no encontrado');
+
+    if (current.googleId && current.googleId !== identity.googleId) {
+      throw new ConflictException('Esta cuenta Vibit ya tiene otro Google vinculado');
+    }
+
+    const other = await this.usersService.findByGoogleId(identity.googleId);
+    if (other && other._id.toString() !== userId) {
+      throw new ConflictException('Esa cuenta de Google ya está vinculada a otro Vibit');
+    }
+
+    const updated = await this.usersService.linkGoogle(
+      userId,
+      identity.googleId,
+      identity.email,
+    );
+    if (!updated) throw new NotFoundException('Usuario no encontrado');
+
+    return {
+      ok: true,
+      user: this.usersService.toPublic(updated),
+    };
+  }
+
+  /** Login solo si Google ya está vinculado a una cuenta Vibit. */
+  async loginWithGoogle(idToken: string) {
+    const identity = await this.googleTokenService.verifyIdToken(idToken);
+    const user = await this.usersService.findByGoogleId(identity.googleId);
+    if (!user) {
+      throw new UnauthorizedException(
+        'No hay una cuenta Vibit vinculada a este Google. Crea tu cuenta y vincúlala desde la app.',
+      );
+    }
+
+    const accessToken = await this.signToken(user._id.toString(), user.userCode);
+    return {
+      accessToken,
+      user: this.usersService.toPublic(user),
+    };
   }
 }

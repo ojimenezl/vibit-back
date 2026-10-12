@@ -19,6 +19,14 @@ export class UsersService {
     return this.usersRepository.findByUserCode(userCode);
   }
 
+  findByGoogleId(googleId: string) {
+    return this.usersRepository.findByGoogleId(googleId);
+  }
+
+  linkGoogle(userId: string, googleId: string, googleEmail: string | null) {
+    return this.usersRepository.linkGoogle(userId, googleId, googleEmail);
+  }
+
   findById(id: string) {
     return this.usersRepository.findById(id);
   }
