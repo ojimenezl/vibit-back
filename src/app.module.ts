@@ -11,6 +11,7 @@ import { WidgetModule } from './widget/widget.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { HealthController } from './health/health.controller';
+import { AppConfigController } from './app-config/app-config.controller';
 import { RealtimeModule } from './realtime/realtime.module';
 import { PushModule } from './push/push.module';
 
@@ -32,7 +33,7 @@ import { PushModule } from './push/push.module';
     RealtimeModule,
     PushModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AppConfigController],
   providers: [
     {
       provide: APP_FILTER,

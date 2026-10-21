@@ -59,6 +59,18 @@ export class AuthService {
     const pinHash = await bcrypt.hash(dto.pin, 12);
     const linkUser = this.generateLinkUser();
 
+    let googleId: string | null = null;
+    let googleEmail: string | null = null;
+    if (dto.idToken?.trim()) {
+      const identity = await this.googleTokenService.verifyIdToken(dto.idToken);
+      const other = await this.usersService.findByGoogleId(identity.googleId);
+      if (other) {
+        throw new ConflictException('Esa cuenta de Google ya está vinculada a otro Vibit');
+      }
+      googleId = identity.googleId;
+      googleEmail = identity.email;
+    }
+
     const user = await this.usersService.create({
       username,
       userCode,
@@ -68,8 +80,8 @@ export class AuthService {
       notificaciones: [],
       idTableros: [],
       fcmTokens: [],
-      googleId: null,
-      googleEmail: null,
+      googleId,
+      googleEmail,
     });
 
     const tablero = await this.tablerosService.createPersonal(user._id.toString(), username);
@@ -163,20 +175,31 @@ export class AuthService {
     };
   }
 
-  /** Login solo si Google ya está vinculado a una cuenta Vibit. */
+  /**
+   * Si Google ya está vinculado → login.
+   * Si no → needsOnboarding para que el front complete username + PIN y registre con idToken.
+   */
   async loginWithGoogle(idToken: string) {
     const identity = await this.googleTokenService.verifyIdToken(idToken);
     const user = await this.usersService.findByGoogleId(identity.googleId);
-    if (!user) {
-      throw new UnauthorizedException(
-        'No hay una cuenta Vibit vinculada a este Google. Crea tu cuenta y vincúlala desde la app.',
-      );
+    if (user) {
+      const accessToken = await this.signToken(user._id.toString(), user.userCode);
+      return {
+        needsOnboarding: false as const,
+        accessToken,
+        user: this.usersService.toPublic(user),
+      };
     }
 
-    const accessToken = await this.signToken(user._id.toString(), user.userCode);
+    const emailLocal = identity.email?.split('@')[0]?.trim() || '';
+    const suggestedUsername = emailLocal
+      .replace(/[^a-zA-Z0-9._-]/g, '')
+      .slice(0, 32);
+
     return {
-      accessToken,
-      user: this.usersService.toPublic(user),
+      needsOnboarding: true as const,
+      suggestedUsername: suggestedUsername.length >= 2 ? suggestedUsername : '',
+      googleEmail: identity.email,
     };
   }
 }
