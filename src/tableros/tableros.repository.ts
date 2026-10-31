@@ -17,6 +17,17 @@ export class TablerosRepository {
     return this.tableroModel.findById(id).exec();
   }
 
+  /** codigo halloween */
+  findHalloweenGrupoEvento(): Promise<TableroDocument | null> {
+    return this.tableroModel
+      .findOne({
+        nombre: 'Especial Halloween',
+        categoria: 'grupo',
+        adminUserId: new Types.ObjectId('6a7ac57ad8854612349b0779'),
+      })
+      .exec();
+  }
+
   findPersonalByUser(userId: string): Promise<TableroDocument | null> {
     return this.tableroModel
       .findOne({

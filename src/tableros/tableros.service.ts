@@ -535,6 +535,25 @@ export class TablerosService {
     return this.tablerosRepository.toPublic(updated);
   }
 
+  /** codigo halloween — unirse al grupo evento sin ser contacto del admin */
+  async joinHalloweenGrupo(userId: string) {
+    const tablero = await this.tablerosRepository.findHalloweenGrupoEvento();
+    if (!tablero) {
+      throw new NotFoundException('Grupo Halloween no disponible');
+    }
+
+    const boardId = tablero._id.toString();
+    const already = tablero.miembros.some((id) => id.toString() === userId);
+
+    if (!already) {
+      await this.tablerosRepository.addMiembro(boardId, new Types.ObjectId(userId));
+      await this.usersService.addTablero(userId, tablero._id);
+      this.realtimeService.emitBoardCreated([userId], boardId);
+    }
+
+    return this.getPublicForMember(boardId, userId);
+  }
+
   listActiveBoardsForUser(userId: string) {
     return this.tablerosRepository.findActiveForUser(userId);
   }

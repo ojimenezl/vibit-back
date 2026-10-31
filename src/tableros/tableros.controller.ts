@@ -42,6 +42,12 @@ export class TablerosController {
     return this.tablerosService.listShared(user.userId);
   }
 
+  /** codigo halloween */
+  @Post('eventos/halloween/unirse')
+  joinHalloween(@CurrentUser() user: JwtPayloadUser) {
+    return this.tablerosService.joinHalloweenGrupo(user.userId);
+  }
+
   @Post('directa/share')
   async shareDirecta(@CurrentUser() user: JwtPayloadUser, @Body() dto: ShareDirectaDto) {
     const created = await this.tablerosService.shareDirecta(user.userId, dto);
